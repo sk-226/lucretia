@@ -2,7 +2,7 @@
   "name": "lucretia-theme",
   "displayName": "Lucretia",
   "description": "Flexoki-inspired quiet color theme (sparse highlighting)",
-  "version": "0.1.0",
+  "version": "0.2.1",
   "publisher": "sugu",
   "engines": {
     "vscode": "^1.75.0"

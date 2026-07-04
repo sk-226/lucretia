@@ -23,12 +23,11 @@ BG, BG2 = pal['bg']['bg'], pal['bg']['bg2']
 PBASE = {s: v['hex'] for s, v in pal['paper']['base'].items()}
 PBG, PBG2 = pal['paper']['bg'], pal['paper']['bg2']
 
-
 # ============================================================
 # VS Code テーマ (plan.md §6.3: sparse highlighting)
 # ============================================================
 
-def token_colors(syn):
+def token_colors(syn, tx2):
     """Tier 設計 (plan.md §6.3)。変数はルールなし = エディタ前景色のまま (Tier 1)"""
     return [
         dict(name='Comment (Tier 4)', scope=['comment', 'punctuation.definition.comment'],
@@ -48,7 +47,51 @@ def token_colors(syn):
         dict(name='Number / constant (Tier 3)',
              scope=['constant.numeric', 'constant.language', 'constant.character'],
              settings=dict(foreground=syn['number'])),
+        # --- markup (Markdown / LaTeX 等)。装飾は色でなく書体で表現する ---
+        dict(name='Markup heading / LaTeX section',
+             scope=['markup.heading', 'entity.name.section'],
+             settings=dict(fontStyle='bold')),
+        dict(name='Markup bold (\\textbf 等)',
+             scope=['markup.bold', 'strong'],
+             settings=dict(fontStyle='bold')),
+        dict(name='Markup italic (\\textit, \\emph 等)',
+             scope=['markup.italic', 'emphasis'],
+             settings=dict(fontStyle='italic')),
+        dict(name='Markup bold+italic (入れ子)',
+             scope=['markup.bold markup.italic',
+                    'markup.italic markup.bold'],
+             settings=dict(fontStyle='bold italic')),
+        dict(name='Markup underline (\\underline 等)',
+             scope=['markup.underline'],
+             settings=dict(fontStyle='underline')),
+        dict(name='Markup strikethrough',
+             scope=['markup.strikethrough'],
+             settings=dict(fontStyle='strikethrough')),
+        dict(name='Markup quote',
+             scope=['markup.quote'],
+             settings=dict(foreground=tx2, fontStyle='italic')),
+        dict(name='Reference / citation key (\\ref, \\cite 等, Tier 3)',
+             scope=['constant.other.reference'],
+             settings=dict(foreground=syn['definition'])),
     ]
+
+
+def semantic_tokens(syn, tx):
+    """semanticTokenColors: Tier 設計 (plan.md §6.3) を LSP semantic token にも適用。
+    variable 系を tx に明示固定し (Tier 1)、着色は定義箇所と既存 hue に限定する。
+    これがないと言語サーバー既定のマッピングで TextMate ルール外の色が混入しうる"""
+    d = syn['definition']
+    return {
+        'variable': tx, 'parameter': tx, 'property': tx,          # Tier 1
+        'function.declaration': d, 'method.declaration': d,       # Tier 2
+        'class.declaration': d, 'interface.declaration': d,
+        'struct.declaration': d, 'enum.declaration': d,
+        'type.declaration': d,
+        'keyword': syn['keyword'],                                # Tier 2
+        'string': syn['string'], 'number': syn['number'],         # Tier 3
+        'operator': syn['operator'],                              # Tier 4
+        'comment': dict(foreground=syn['comment'], fontStyle='italic'),
+    }
 
 
 def ansi(theme):
@@ -85,7 +128,15 @@ def vscode_theme(kind):
         bg, bg2 = ui['bg'], ui['bg-2']
     tx, tx2, tx3 = ui['tx'], ui['tx-2'], ui['tx-3']
     sel = AC['blue']['150'] if light else AC['blue']['850']
+    inp = PBASE['50'] if kind == 'paper' else WHITE if light else BASE['900']
+    err = AC['red']['600' if light else '300']
+    warn = AC['orange']['600' if light else '300']
+    info = AC['blue']['600' if light else '300']
     a = ansi(kind)
+
+    def ac(name, ls, ds):
+        """アクセント色をテーマ別シェードで引く (light系 / dark)"""
+        return AC[name][ls if light else ds]
     colors = {
         'editor.background': bg,
         'editor.foreground': tx,
@@ -122,25 +173,116 @@ def vscode_theme(kind):
         'badge.foreground': WHITE,
         'button.background': AC['blue']['600'],
         'button.foreground': WHITE,
-        'input.background': (PBASE['50'] if kind == 'paper'
-                             else WHITE if light else BASE['900']),
+        'input.background': inp,
         'input.foreground': tx,
         'input.border': ui['ui-3'],
-        'editorWarning.foreground': AC['orange']['600' if light else '300'],
-        'editorError.foreground': AC['red']['600' if light else '300'],
-        'editorInfo.foreground': AC['blue']['600' if light else '300'],
+        'input.placeholderForeground': tx3,
+        'dropdown.background': inp,
+        'dropdown.foreground': tx,
+        'dropdown.border': ui['ui-3'],
+        'editorWarning.foreground': warn,
+        'editorError.foreground': err,
+        'editorInfo.foreground': info,
+
+        # --- bracket pair colorization ---
+        # 括弧のみ 6 色フルサイクル (細いグリフで面積が小さく hue 数制限の例外)。
+        # 同一シェード帯だと細グリフでは hue 差だけで識別できないため、
+        # 全ペア間 OKLab 距離の最小値を最大化するようシェード (=明度) も振って選定。
+        # CVD (D/P 型) シミュレーション距離とAPCA |Lc|>=45 (light) / 50 (dark) を制約に
+        # 全探索した結果 (通常視 0.104→0.176, D 型隣接 0.049→0.173)。
+        # 循環順も隣接間距離が最大になる並び: blue→orange→purple→yellow→magenta→cyan
+        'editorBracketHighlight.foreground1': ac('blue', '700', '300'),
+        'editorBracketHighlight.foreground2': ac('orange', '400', '200'),
+        'editorBracketHighlight.foreground3': ac('purple', '400', '200'),
+        'editorBracketHighlight.foreground4': ac('yellow', '700', '400'),
+        'editorBracketHighlight.foreground5': ac('magenta', '700', '300'),
+        'editorBracketHighlight.foreground6': ac('cyan', '500', '200'),
+        'editorBracketHighlight.unexpectedBracket.foreground':
+            ac('red', '600', '300'),
+        'editorBracketMatch.background': ui['ui'],
+        'editorBracketMatch.border': tx3,
+
+        # --- 検索・選択・単語ハイライト ---
+        'editor.findMatchBackground':
+            HL['yellow'] if light else AC['yellow']['850'],
+        'editor.findMatchBorder': ac('yellow', '600', '400'),
+        'editor.findMatchHighlightBackground':
+            (HL['yellow'] + '66') if light else AC['yellow']['400'] + '33',
+        'editor.wordHighlightBackground': ac('blue', '100', '850') + '80',
+        'editor.wordHighlightStrongBackground':
+            ac('magenta', '100', '850') + '80',
+        'editor.selectionHighlightBackground': ac('blue', '100', '850') + '66',
+        'editor.inactiveSelectionBackground': sel + '80',
+        'terminal.selectionBackground': sel,
+
+        # --- git diff / 変更表示 ---
+        'editorGutter.addedBackground': ac('green', '500', '400'),
+        'editorGutter.modifiedBackground': ac('blue', '500', '400'),
+        'editorGutter.deletedBackground': ac('red', '500', '400'),
+        'diffEditor.insertedTextBackground': ac('green', '500', '400') + '26',
+        'diffEditor.removedTextBackground': ac('red', '500', '400') + '26',
+        'diffEditor.insertedLineBackground': ac('green', '500', '400') + '14',
+        'diffEditor.removedLineBackground': ac('red', '500', '400') + '14',
+        'gitDecoration.addedResourceForeground': ac('green', '600', '400'),
+        'gitDecoration.untrackedResourceForeground': ac('green', '600', '400'),
+        'gitDecoration.modifiedResourceForeground': ac('blue', '600', '300'),
+        'gitDecoration.deletedResourceForeground': ac('red', '600', '300'),
+        'gitDecoration.conflictingResourceForeground':
+            ac('orange', '600', '300'),
+        'gitDecoration.ignoredResourceForeground': tx3,
+
+        # --- タブ・エディタグループ ---
+        'tab.activeBorderTop': ui['focus-ring'],
+        'tab.hoverBackground': bg,
+        'tab.border': ui['ui'],
+        'editorGroupHeader.tabsBackground': bg2,
+
+        # --- サイドバー / リスト ---
+        'list.inactiveSelectionBackground': ui['ui'],
+        'list.focusBackground': sel,
+        'list.focusForeground': tx,
+        'sideBarSectionHeader.background': bg2,
+        'sideBarSectionHeader.foreground': tx2,
+        'tree.indentGuidesStroke': ui['ui-2'],
+
+        # --- Command Palette / Quick Pick ---
+        'quickInput.background': bg2,
+        'quickInput.foreground': tx,
+        'quickInputList.focusBackground': sel,
+        'quickInputList.focusForeground': tx,
+        'pickerGroup.foreground': ui['link'],
+        'pickerGroup.border': ui['ui'],
+
+        # --- エディタ内ウィジェット / スクロールバー ---
+        'editorWidget.background': bg2,
+        'editorWidget.border': ui['ui-3'],
+        'editorSuggestWidget.selectedBackground': sel,
+        'editorHoverWidget.background': bg2,
+        'editorHoverWidget.border': ui['ui-3'],
+        'scrollbarSlider.background': tx3 + '33',
+        'scrollbarSlider.hoverBackground': tx3 + '55',
+        'scrollbarSlider.activeBackground': tx3 + '77',
+
+        # --- 診断 (波線は foreground のみ。border は二重マークになるため設けない) ---
+        'editorOverviewRuler.errorForeground': err,
+        'editorOverviewRuler.warningForeground': warn,
+        'editorOverviewRuler.infoForeground': info,
+        'editorOverviewRuler.findMatchForeground': AC['yellow']['500'] + '88',
+        'editorOverviewRuler.bracketMatchForeground': ui['ui-3'],
     }
     for k, v in a.items():
         colors[f'terminal.ansi{k[0].upper()}{k[1:]}'] = v
     return dict(name=f'Lucretia {kind.capitalize()}',
                 type='light' if light else 'dark',
-                colors=colors, tokenColors=token_colors(syn))
+                semanticHighlighting=True,
+                semanticTokenColors=semantic_tokens(syn, tx),
+                colors=colors, tokenColors=token_colors(syn, tx2))
 
 
 VSCODE_PKG = dict(
     name='lucretia-theme', displayName='Lucretia',
     description='Flexoki-inspired quiet color theme (sparse highlighting)',
-    version='0.1.0', publisher='sugu', engines={'vscode': '^1.75.0'},
+    version='0.2.1', publisher='sugu', engines={'vscode': '^1.75.0'},
     categories=['Themes'],
     contributes=dict(themes=[
         dict(label='Lucretia Light', uiTheme='vs',
