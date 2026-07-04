@@ -44,12 +44,12 @@ for i in {0..15}; do print -nP "%F{$i}A%f "; done; echo
 
 ## テーマ更新の反映方法 (エディタ別)
 
-- **Cursor**: `~/.cursor/extensions/lucretia-theme` が dist へのシンボリックリンク。
-  `build_dist.py` の version を上げて再生成 → Cursor を再起動 (Cmd+Q)
-- **VSCode**: シンボリックリンクは認識しないため vsix でインストールする:
+- **VS Code / Cursor 共通**: リポジトリ直下で次を実行する:
   ```sh
-  cd dist/vscode
-  echo y | npx -y @vscode/vsce package --allow-missing-repository -o lucretia-theme.vsix
-  code --install-extension lucretia-theme.vsix
+  ./scripts/install_editor_theme.sh
   ```
-  コピー式なので、テーマを更新するたびに再パッケージ + 再インストールが必要
+  同じ VSIX を両方へ入れる。Cursor だけ dist へのシンボリックリンクにすると、
+  VS Code とは更新モデルがずれ、Cursor の `.obsolete` キャッシュに残った version と
+  衝突してテーマが一覧から消えることがある。
+- 更新後は両方のエディタを再起動 (Cmd+Q) する。単なるウィンドウ再読み込みでは、
+  拡張一覧キャッシュが古いまま残る場合がある。

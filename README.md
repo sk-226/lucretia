@@ -27,9 +27,11 @@ assets/photos/       ギャラリーモック用の実写 3 枚（保存済み�
 
 再生成: `python3 scripts/build.py && python3 scripts/build_dist.py`
 
-VS Code テーマの試用:
-`ln -s "$(pwd)/dist/vscode" ~/.vscode/extensions/lucretia-theme` → VS Code 再起動 →
+VS Code / Cursor テーマの試用:
+`./scripts/install_editor_theme.sh` → 両方のエディタを再起動 →
 テーマ選択で "Lucretia Light" / "Lucretia Dark" / "Lucretia Paper"（長文読書用）。
+このスクリプトは同じ VSIX を VS Code と Cursor の両方に入れる。片方だけ symlink にすると
+Cursor の `.obsolete` キャッシュと拡張バージョンが衝突してテーマが一覧から消えることがあるため。
 Obsidian: `dist/obsidian/lucretia.css` を vault の `.obsidian/snippets/` にコピーして有効化。
 読書用は `lucretia-paper.css`（lucretia.css とはどちらか一方だけ有効化）。
 

@@ -23,6 +23,14 @@ BG, BG2 = pal['bg']['bg'], pal['bg']['bg2']
 PBASE = {s: v['hex'] for s, v in pal['paper']['base'].items()}
 PBG, PBG2 = pal['paper']['bg'], pal['paper']['bg2']
 
+# VS Code 互換エディタは拡張 ID だけでなく version もローカルキャッシュや
+# .obsolete 判定に使う。開発中に同じ version の VSIX / symlink / 手動削除を
+# 行き来すると、Cursor 側で「現在の拡張」が古い削除済みエントリと衝突し、
+# 拡張一覧から消えることがある。更新作業では version を進め、両エディタへ
+# 同じ VSIX を入れることで、キャッシュを自然に新しい拡張として扱わせる。
+# ここを package.json 側の単一ソースにして、生成物の手修正を避ける。
+VSCODE_EXTENSION_VERSION = '0.2.2'
+
 # ============================================================
 # VS Code テーマ (plan.md §6.3: sparse highlighting)
 # ============================================================
@@ -282,8 +290,13 @@ def vscode_theme(kind):
 VSCODE_PKG = dict(
     name='lucretia-theme', displayName='Lucretia',
     description='Flexoki-inspired quiet color theme (sparse highlighting)',
-    version='0.2.1', publisher='sugu', engines={'vscode': '^1.75.0'},
+    version=VSCODE_EXTENSION_VERSION, publisher='sugu', engines={'vscode': '^1.75.0'},
     categories=['Themes'],
+    # VSIX は dist/vscode を作業ディレクトリにして作るため、将来ここに確認用
+    # ファイルや一時成果物が増えても配布物へ混ざらないよう明示的に絞る。
+    # .vscodeignore ではなく package.json の files に置くのは、配布対象を
+    # 生成元の単一ソースから読める状態にしておくため。
+    files=['themes/*.json'],
     contributes=dict(themes=[
         dict(label='Lucretia Light', uiTheme='vs',
              path='./themes/lucretia-light-color-theme.json'),
