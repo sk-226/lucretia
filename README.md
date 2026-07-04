@@ -17,10 +17,11 @@ out/contrast.html    コントラスト行列（WCAG + APCA）+ 淡色帯 50–2
 out/cvd.html         P/D/T 型 (Machado 2009) シミュレーション + ペア ΔEok 行列
 out/roles.html       ロール表 + 用途モック（スライド / Markdown / コードエディタ / ギャラリー実写）
 out/degrade.html     投影劣化シミュレーション（彩度低下 / ガンマ / 黒浮き）
+out/paper.html       lucretia paper（長文読書プロファイル §6.5）: 確定 bg プレビュー + 読書モック
 out/tokens.css       CSS variables（--lu-* パレット + data-theme/data-contrast ロール）
 scripts/build_dist.py 配布物生成（palette.json → dist/）
-dist/vscode/         VS Code テーマ拡張（Light / Dark + ターミナル ANSI 16）
-dist/obsidian/       Obsidian CSS スニペット（リンク・ハイライター 8 色）
+dist/vscode/         VS Code テーマ拡張（Light / Dark / Paper + ターミナル ANSI 16）
+dist/obsidian/       Obsidian CSS スニペット（lucretia.css / 読書用 lucretia-paper.css）
 assets/photos/       ギャラリーモック用の実写 3 枚（保存済み）
 ```
 
@@ -28,8 +29,9 @@ assets/photos/       ギャラリーモック用の実写 3 枚（保存済み�
 
 VS Code テーマの試用:
 `ln -s "$(pwd)/dist/vscode" ~/.vscode/extensions/lucretia-theme` → VS Code 再起動 →
-テーマ選択で "Lucretia Light" / "Lucretia Dark"。
+テーマ選択で "Lucretia Light" / "Lucretia Dark" / "Lucretia Paper"（長文読書用）。
 Obsidian: `dist/obsidian/lucretia.css` を vault の `.obsidian/snippets/` にコピーして有効化。
+読書用は `lucretia-paper.css`（lucretia.css とはどちらか一方だけ有効化）。
 
 ## 生成モデルの検証状況
 
@@ -53,6 +55,11 @@ out/cvd.html, out/contrast.html。
   ハイライター hl-\*（黒文字専用、plan.md §9-13）を追加
 - photo-surface 確定: ライト = bg（§9-14）/ ダーク = base-950（§9-15、ダークギャラリー採用）
 - **→ out/roles.html のモック 4 種（スライド / Markdown / コード / ギャラリー）を目視確認**
+
+**lucretia paper（長文読書プロファイル、2026-07 追加）: bg = P2 #F8F5EB 確定（plan.md §9-16）**
+- 設計は plan.md §6.5。暖色 pbase + 書籍インク帯 tx（pbase-900、12.5:1 / Lc +94）
+- **→ VS Code "Lucretia Paper" / Obsidian lucretia-paper.css を数日実運用して
+  インク帯の適否を確認（plan.md §9 未決-2）**
 
 **Phase 4 — 実地検証（要ユーザー）**
 - ~~検証写真の保存~~ 済み → out/roles.html のギャラリーモックが実写表示

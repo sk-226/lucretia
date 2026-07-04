@@ -21,6 +21,11 @@
         "label": "Lucretia Dark",
         "uiTheme": "vs-dark",
         "path": "./themes/lucretia-dark-color-theme.json"
+      },
+      {
+        "label": "Lucretia Paper",
+        "uiTheme": "vs",
+        "path": "./themes/lucretia-paper-color-theme.json"
       }
     ]
   }

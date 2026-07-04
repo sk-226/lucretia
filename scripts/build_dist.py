@@ -20,6 +20,8 @@ AC = {n: {s: v['hex'] for s, v in scale.items()} for n, scale in pal['accents'].
 HL = {n: v['hex'] for n, v in pal['highlight'].items()}
 WHITE, BLACK = pal['special']['white'], pal['special']['black']
 BG, BG2 = pal['bg']['bg'], pal['bg']['bg2']
+PBASE = {s: v['hex'] for s, v in pal['paper']['base'].items()}
+PBG, PBG2 = pal['paper']['bg'], pal['paper']['bg2']
 
 
 # ============================================================
@@ -51,10 +53,13 @@ def token_colors(syn):
 
 def ansi(theme):
     """ターミナル ANSI 16 色 (plan.md §6.3: 色名は ANSI と自然に整合)"""
-    if theme == 'light':
+    if theme in ('light', 'paper'):
         n, b = '600', '400'   # normal / bright
-        return dict(black=BLACK, white=BASE['150'],
-                    brightBlack=BASE['600'], brightWhite=WHITE,
+        # paper は無彩色スロットのみ暖色 pbase に置換 (有彩 6 色は共通)
+        blk, wht, bblk = ((PBASE['950'], PBASE['150'], PBASE['600'])
+                          if theme == 'paper' else (BLACK, BASE['150'], BASE['600']))
+        return dict(black=blk, white=wht,
+                    brightBlack=bblk, brightWhite=WHITE,
                     **{c: AC[c][n] for c in ('red', 'green', 'yellow', 'blue',
                                              'magenta', 'cyan')},
                     **{f'bright{c.capitalize()}': AC[c][b]
@@ -69,10 +74,15 @@ def ansi(theme):
 
 
 def vscode_theme(kind):
-    light = kind == 'light'
-    ui = R['light'] | R['light_high'] if light else R['dark']
-    syn = R['syntax_light'] if light else R['syntax_dark']
-    bg, bg2 = (BG, BG2) if light else (ui['bg'], ui['bg-2'])
+    light = kind in ('light', 'paper')
+    if kind == 'light':
+        ui, syn, (bg, bg2) = R['light'] | R['light_high'], R['syntax_light'], (BG, BG2)
+    elif kind == 'paper':
+        # lucretia paper (plan.md §6.5): white は使わない (ハレーション回避)
+        ui, syn, (bg, bg2) = R['paper'], R['syntax_paper'], (PBG, PBG2)
+    else:
+        ui, syn = R['dark'], R['syntax_dark']
+        bg, bg2 = ui['bg'], ui['bg-2']
     tx, tx2, tx3 = ui['tx'], ui['tx-2'], ui['tx-3']
     sel = AC['blue']['150'] if light else AC['blue']['850']
     a = ansi(kind)
@@ -112,7 +122,8 @@ def vscode_theme(kind):
         'badge.foreground': WHITE,
         'button.background': AC['blue']['600'],
         'button.foreground': WHITE,
-        'input.background': WHITE if light else BASE['900'],
+        'input.background': (PBASE['50'] if kind == 'paper'
+                             else WHITE if light else BASE['900']),
         'input.foreground': tx,
         'input.border': ui['ui-3'],
         'editorWarning.foreground': AC['orange']['600' if light else '300'],
@@ -121,7 +132,7 @@ def vscode_theme(kind):
     }
     for k, v in a.items():
         colors[f'terminal.ansi{k[0].upper()}{k[1:]}'] = v
-    return dict(name=f'Lucretia {"Light" if light else "Dark"}',
+    return dict(name=f'Lucretia {kind.capitalize()}',
                 type='light' if light else 'dark',
                 colors=colors, tokenColors=token_colors(syn))
 
@@ -136,6 +147,8 @@ VSCODE_PKG = dict(
              path='./themes/lucretia-light-color-theme.json'),
         dict(label='Lucretia Dark', uiTheme='vs-dark',
              path='./themes/lucretia-dark-color-theme.json'),
+        dict(label='Lucretia Paper', uiTheme='vs',
+             path='./themes/lucretia-paper-color-theme.json'),
     ]))
 
 
@@ -169,13 +182,44 @@ def obsidian_css():
     return '\n'.join(ln) + '\n'
 
 
+def obsidian_paper_css():
+    """lucretia paper (plan.md §6.5): 長文読書用。lucretia.css と同時に有効化しない"""
+    md, pa = R['markdown_paper'], R['paper']
+    ln = [
+        '/* lucretia paper — Obsidian CSS snippet. scripts/build_dist.py が生成 (手編集しない)',
+        '   長文読書用の温かみプロファイル。lucretia.css とはどちらか一方だけ有効化する */',
+        '.theme-light {',
+        f'  --background-primary: {PBG};',
+        f'  --background-secondary: {PBG2};',
+        f'  --text-normal: {pa["tx"]};',
+        f'  --text-muted: {pa["tx-2"]};',
+        f'  --text-faint: {pa["tx-3"]};',
+        f'  --link-color: {md["link"]};',
+        f'  --link-external-color: {md["link"]};',
+        f'  --code-background: {md["code-inline-bg"]};',
+        f'  --blockquote-border-color: {md["quote-border"]};',
+        f'  --hr-color: {md["hr"]};',
+        f'  --text-highlight-bg: {HL["yellow"]};  /* 既定マーカー = hl-yellow */',
+        '}',
+        '/* 見出しは本文より一段沈めた無彩色で階層を出す (markdown_paper.heading) */',
+        '.theme-light .markdown-preview-view :is(h1,h2,h3,h4,h5,h6),',
+        '.theme-light .cm-header {',
+        f'  color: {md["heading"]};',
+        '}',
+        '/* ハイライター 8 色 (黒文字専用の規約, plan.md §9-13) */',
+    ]
+    for n, v in HL.items():
+        ln.append(f'.theme-light mark.hl-{n}, .theme-light .hl-{n} {{ background: {v}; }}')
+    return '\n'.join(ln) + '\n'
+
+
 # ============================================================
 if __name__ == '__main__':
     vs = os.path.join(DIST, 'vscode')
     os.makedirs(os.path.join(vs, 'themes'), exist_ok=True)
     with open(os.path.join(vs, 'package.json'), 'w') as f:
         json.dump(VSCODE_PKG, f, indent=2)
-    for kind in ('light', 'dark'):
+    for kind in ('light', 'dark', 'paper'):
         p = os.path.join(vs, 'themes', f'lucretia-{kind}-color-theme.json')
         with open(p, 'w') as f:
             json.dump(vscode_theme(kind), f, ensure_ascii=False, indent=2)
@@ -183,4 +227,7 @@ if __name__ == '__main__':
     os.makedirs(ob, exist_ok=True)
     with open(os.path.join(ob, 'lucretia.css'), 'w') as f:
         f.write(obsidian_css())
-    print('generated: dist/vscode/{package.json,themes/*.json}, dist/obsidian/lucretia.css')
+    with open(os.path.join(ob, 'lucretia-paper.css'), 'w') as f:
+        f.write(obsidian_paper_css())
+    print('generated: dist/vscode/{package.json,themes/*.json}, '
+          'dist/obsidian/{lucretia,lucretia-paper}.css')

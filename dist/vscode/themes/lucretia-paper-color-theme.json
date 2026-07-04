@@ -1,0 +1,132 @@
+{
+  "name": "Lucretia Paper",
+  "type": "light",
+  "colors": {
+    "editor.background": "#F8F5EB",
+    "editor.foreground": "#2F2E2A",
+    "editor.lineHighlightBackground": "#F0EDE1",
+    "editor.selectionBackground": "#B5D4F7",
+    "editorCursor.foreground": "#2F2E2A",
+    "editorLineNumber.foreground": "#7F7D77",
+    "editorLineNumber.activeForeground": "#5A5853",
+    "editorIndentGuide.background1": "#E8E4DB",
+    "editorWhitespace.foreground": "#DAD7CE",
+    "sideBar.background": "#F0EDE1",
+    "sideBar.foreground": "#5A5853",
+    "activityBar.background": "#F0EDE1",
+    "activityBar.foreground": "#2F2E2A",
+    "statusBar.background": "#F0EDE1",
+    "statusBar.foreground": "#5A5853",
+    "titleBar.activeBackground": "#F0EDE1",
+    "titleBar.activeForeground": "#5A5853",
+    "tab.activeBackground": "#F8F5EB",
+    "tab.activeForeground": "#2F2E2A",
+    "tab.inactiveBackground": "#F0EDE1",
+    "tab.inactiveForeground": "#5A5853",
+    "panel.background": "#F8F5EB",
+    "panelTitle.activeForeground": "#2F2E2A",
+    "terminal.background": "#F8F5EB",
+    "terminal.foreground": "#2F2E2A",
+    "focusBorder": "#4687CC",
+    "textLink.foreground": "#155FA6",
+    "textLink.activeForeground": "#023D72",
+    "list.activeSelectionBackground": "#B5D4F7",
+    "list.activeSelectionForeground": "#2F2E2A",
+    "list.hoverBackground": "#F0EDE1",
+    "badge.background": "#155FA6",
+    "badge.foreground": "#FFFFFF",
+    "button.background": "#155FA6",
+    "button.foreground": "#FFFFFF",
+    "input.background": "#F5F2E7",
+    "input.foreground": "#2F2E2A",
+    "input.border": "#CDCAC1",
+    "editorWarning.foreground": "#BB530D",
+    "editorError.foreground": "#AF3028",
+    "editorInfo.foreground": "#155FA6",
+    "terminal.ansiBlack": "#201F1C",
+    "terminal.ansiWhite": "#DAD7CE",
+    "terminal.ansiBrightBlack": "#6E6C66",
+    "terminal.ansiBrightWhite": "#FFFFFF",
+    "terminal.ansiRed": "#AF3028",
+    "terminal.ansiGreen": "#678005",
+    "terminal.ansiYellow": "#AC8400",
+    "terminal.ansiBlue": "#155FA6",
+    "terminal.ansiMagenta": "#A02F6E",
+    "terminal.ansiCyan": "#00857C",
+    "terminal.ansiBrightRed": "#D95E52",
+    "terminal.ansiBrightGreen": "#8EA746",
+    "terminal.ansiBrightYellow": "#D5AC45",
+    "terminal.ansiBrightBlue": "#4687CC",
+    "terminal.ansiBrightMagenta": "#C95B95",
+    "terminal.ansiBrightCyan": "#47ACA3"
+  },
+  "tokenColors": [
+    {
+      "name": "Comment (Tier 4)",
+      "scope": [
+        "comment",
+        "punctuation.definition.comment"
+      ],
+      "settings": {
+        "foreground": "#94928B",
+        "fontStyle": "italic"
+      }
+    },
+    {
+      "name": "Operator / punctuation (Tier 4)",
+      "scope": [
+        "keyword.operator",
+        "punctuation"
+      ],
+      "settings": {
+        "foreground": "#7F7D77"
+      }
+    },
+    {
+      "name": "Keyword (Tier 2)",
+      "scope": [
+        "keyword",
+        "keyword.control",
+        "storage.type",
+        "storage.modifier"
+      ],
+      "settings": {
+        "foreground": "#A02F6E"
+      }
+    },
+    {
+      "name": "Function / type definition (Tier 2)",
+      "scope": [
+        "entity.name.function",
+        "entity.name.type",
+        "entity.name.class",
+        "support.function",
+        "entity.other.inherited-class"
+      ],
+      "settings": {
+        "foreground": "#155FA6"
+      }
+    },
+    {
+      "name": "String (Tier 3)",
+      "scope": [
+        "string",
+        "string.quoted"
+      ],
+      "settings": {
+        "foreground": "#678005"
+      }
+    },
+    {
+      "name": "Number / constant (Tier 3)",
+      "scope": [
+        "constant.numeric",
+        "constant.language",
+        "constant.character"
+      ],
+      "settings": {
+        "foreground": "#5D409D"
+      }
+    }
+  ]
+}

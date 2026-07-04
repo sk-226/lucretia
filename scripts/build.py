@@ -62,6 +62,16 @@ BG2_OFFSET = (-0.025, +0.002)  # bg-2 = (L+dL, C+dC)
 WHITE = '#FFFFFF'
 BLACK_L, BLACK_C = 0.17, 0.002
 
+# ------------------------------------------------------------
+# lucretia paper (plan.md §6.5): 長文読書用の温かみプロファイル。
+# 紙の快適さ = 低輝度・暖色スペクトルの近似として bg の L を下げ C を上げる。
+# プレゼン・ギャラリー用途は対象外 (写真中立性の制約がないので暖色 base を使う)
+# ------------------------------------------------------------
+# 背景 — P2 (生成り) に確定 (2026-07, plan.md §9-16。P1/P3 案は廃止)
+PAPER_BG = (0.970, 0.014, 92)
+# 暖色 base (paper 専用)。neutral base は暖色 bg 上で青白く浮くため
+PAPER_BASE = dict(H=92, C_light=.014, C_dark=.006)
+
 
 # ============================================================
 # 生成
@@ -91,15 +101,15 @@ def gen_highlight():
     return out
 
 
-def gen_base():
+def gen_base(cfg=BASE):
     out = {}
     for s in STEPS:
         L = L_BASE[s]
         t = (L - L_BASE[950]) / (L_BASE[50] - L_BASE[950])  # 1=明, 0=暗
-        C = BASE['C_dark'] + (BASE['C_light'] - BASE['C_dark']) * t
-        C = clamp_chroma(L, C, BASE['H'])
-        out[s] = dict(hex=oklch_to_hex(L, C, BASE['H']),
-                      oklch=[round(L, 4), round(C, 4), BASE['H']])
+        C = cfg['C_dark'] + (cfg['C_light'] - cfg['C_dark']) * t
+        C = clamp_chroma(L, C, cfg['H'])
+        out[s] = dict(hex=oklch_to_hex(L, C, cfg['H']),
+                      oklch=[round(L, 4), round(C, 4), cfg['H']])
     return out
 
 
@@ -171,6 +181,29 @@ ROLES = {
     # ハイライター (マーカー線)。規約: base の文字 (tx / tx 太字) の下にのみ引く。
     # 有彩色文字・リンクの上には使わない (色×色で意味が濁るため)
     'highlight': {n: f'hl-{n}' for n in ACCENTS},
+    # lucretia paper (plan.md §6.5): 長文読書プロファイル。
+    # tx = pbase-900 (P2 上 12.5:1 / Lc+94): 高コントラスト基準は満たしつつ
+    # black (17.6:1) のハレーションを避ける「書籍インク」帯。white は使わない
+    'paper': dict(
+        bg='paper-bg', bg_2='paper-bg2',
+        ui='pbase-100', ui_2='pbase-150', ui_3='pbase-200',
+        tx='pbase-900', tx_2='pbase-700', tx_3='pbase-500',
+        link='blue-600', link_hover='blue-800', visited='purple-600',
+        focus_ring='blue-400',
+    ),
+    # シンタックスは syntax_light と同じ hue/step 割当 (P2 上でも同水準の
+    # コントラストを確認済み)。無彩色トークンのみ暖色 pbase / インクに置換
+    'syntax_paper': dict(
+        variable='pbase-900', definition='blue-600', keyword='magenta-600',
+        string='green-600', number='purple-600',
+        operator='pbase-500', comment='pbase-400',
+    ),
+    # Markdown (読書ビュー)。見出しだけ本文より一段沈めて無彩色で階層を出す
+    'markdown_paper': dict(
+        heading='pbase-950', body='pbase-900', link='blue-600',
+        code_inline_bg='pbase-100', code_block_bg='paper-bg2',
+        quote_text='pbase-700', quote_border='pbase-200', hr='pbase-150',
+    ),
 }
 SCRIM_ALPHAS = (5, 10, 20, 40, 60, 80)  # % (plan.md §6.4 overlay-scrim)
 
@@ -180,10 +213,17 @@ def resolve_ref(pal, ref):
         return pal['special'][ref]
     if ref in ('bg', 'bg2'):
         return pal['bg'][ref]
+    if ref in ('paper-bg', 'paper-bg2'):
+        return pal['paper'][ref.replace('paper-', '')]
     if ref.startswith('hl-'):
         return pal['highlight'][ref[3:]]['hex']
     name, step = ref.rsplit('-', 1)
-    scale = pal['base'] if name == 'base' else pal['accents'][name]
+    if name == 'base':
+        scale = pal['base']
+    elif name == 'pbase':
+        scale = pal['paper']['base']
+    else:
+        scale = pal['accents'][name]
     return scale[int(step)]['hex']
 
 
@@ -210,6 +250,15 @@ def build_palette():
     pal['bg'] = dict(bg=bg, bg2=bg2, oklch=[L, C, H],
                      dE_white=round(deltaE_ok(bg, WHITE), 4),
                      dE_paper=round(deltaE_ok(bg, '#FFFCF0'), 4))
+    # lucretia paper (plan.md §6.5)
+    pL, pC, pH = PAPER_BG
+    pbg = oklch_to_hex(pL, pC, pH)
+    pal['paper'] = dict(
+        bg=pbg, bg2=oklch_to_hex(pL + BG2_OFFSET[0], pC + BG2_OFFSET[1], pH),
+        oklch=[pL, pC, pH],
+        dE_bg=round(deltaE_ok(pbg, bg), 4),
+        dE_white=round(deltaE_ok(pbg, WHITE), 4),
+        base=gen_base(PAPER_BASE))
     pal['base'] = gen_base()
     pal['accents'] = {n: gen_accent(n) for n in ACCENTS}
     pal['highlight'] = gen_highlight()
@@ -726,6 +775,93 @@ def html_roles(pal):
 
 
 # ============================================================
+# paper.html (plan.md §6.5 lucretia paper: bg 候補比較 + 読書モック + コントラスト)
+# ============================================================
+
+def html_paper(pal):
+    P = pal['paper']
+    pb = {s: v['hex'] for s, v in P['base'].items()}
+    R = {g: {k: v['hex'] for k, v in pal['roles'][g].items()}
+         for g in ('paper', 'syntax_paper', 'markdown_paper', 'highlight')}
+    pa, syn, md = R['paper'], R['syntax_paper'], R['markdown_paper']
+    h = [f'<!doctype html><meta charset="utf-8"><title>paper</title><style>{CSS}</style>',
+         '<h1>lucretia paper — 長文読書プロファイル (plan.md §6.5)</h1>',
+         '<p class="small">目的: 紙で読む快適さ (低輝度・暖色・非ギラつき) のデジタル近似。'
+         'プレゼン・ギャラリーは対象外。bg = P2 (生成り) に確定 (plan.md §9-16)</p>']
+
+    # --- 1. 確定 bg のプレビュー (参考: 現行 bg / Flexoki paper と並置) ---
+    h.append('<h2>1. 確定 bg (P2) — 同一の読書サンプルで参考色と並置</h2>')
+    long_p = ('反復法の収束は前処理行列の品質に支配される。理論上の収束次数が同じでも、'
+              '固有値分布の裾が重い問題では実効的な反復回数が桁で変わることがある。'
+              'したがって実装では、残差ノルムの推移を必ず記録し、停滞 (stagnation) を'
+              '検出したら再スタートまたは前処理の再構成を行う。')
+    o = P['oklch']
+    refs = [('paper-bg (確定 P2)', P['bg'], f'({o[0]}, {o[1]}, {o[2]}°)'),
+            ('現行 bg', pal['bg']['bg'], '(0.990, 0.006, 95°)'),
+            ('Flexoki paper', '#FFFCF0', '(0.990, 0.016, 95°)')]
+    for name, bgh, oklch in refs:
+        mark = ' ★' if bgh == P['bg'] else ''
+        h.append(
+            f'<div class="card" style="background:{bgh};width:340px">'
+            f'<b style="color:{pa["tx"]}">{name}{mark}</b> '
+            f'<span class="small">{bgh} {oklch} — ΔE white '
+            f'{deltaE_ok(bgh, WHITE):.3f}</span>'
+            f'<p style="color:{pa["tx"]};font-size:13.5px;line-height:1.9;margin:8px 0">'
+            f'{long_p}</p>'
+            f'<p style="color:{pa["tx-2"]};font-size:12px;margin:4px 0">サブテキスト: '
+            f'Saad (2003) 6.4 節、<a style="color:{pa["link"]}">リンクの見え</a>、'
+            f'<code style="background:{md["code-inline-bg"]};border-radius:3px;'
+            f'padding:1px 5px;color:{pa["tx"]}">norm(r)/norm(b)</code></p>'
+            f'<div style="background:{md["code-block-bg"]};border-radius:5px;padding:6px 10px;'
+            f'font-size:11.5px;color:{pa["tx-2"]}">bg-2 相当の面 (コードブロック地)</div>'
+            f'</div>')
+
+    # --- 2. 暖色 base スケール ---
+    h.append('<h2>2. pbase スケール (暖色 H=92。neutral base は暖色 bg 上で青白く浮く)</h2><div>')
+    for s in STEPS:
+        h.append(chip(pb[s], f'pbase-{s}'))
+    h.append('</div><div style="margin-top:6px">比較: neutral base')
+    for s in (500, 700, 900):
+        h.append(chip(pal['base'][s]['hex'], f'base-{s}'))
+    h.append('</div>')
+
+    # --- 3. コントラスト行列 ---
+    pfgs = ([('tx (pbase-900)', pa['tx']), ('tx-2 (pbase-700)', pa['tx-2']),
+             ('tx-3 (pbase-500)', pa['tx-3']), ('black (参考)', pal['special']['black'])]
+            + [(f'{n}-600', pal['accents'][n][600]['hex']) for n in ACCENTS])
+    pbgs = [('paper-bg', P['bg']), ('paper-bg2', P['bg2'])]
+    h.append(matrix('3. paper ロールのコントラスト', pfgs, pbgs,
+                    'tx は「書籍インク」帯: ◎ (≥7:1 & |Lc|≥90) を満たしつつ black の'
+                    'ハレーションを避ける。シンタックス 600 帯は現行ライトと同水準'))
+
+    # --- 4. Markdown 読書モック ---
+    h.append('<h2>4. 読書モック (markdown_paper + ハイライター)</h2>')
+    h.append(
+        f'<div style="width:600px;background:{P["bg"]};border:1px solid #DDD;border-radius:8px;'
+        f'padding:26px 30px;color:{md["body"]};font-size:14.5px;line-height:1.95">'
+        f'<div style="font-size:20px;font-weight:700;color:{md["heading"]};'
+        f'border-bottom:1px solid {md["hr"]};padding-bottom:8px">Krylov 部分空間法 — 読書ノート</div>'
+        f'<p>{long_p}</p>'
+        f'<p><mark style="background:{R["highlight"]["yellow"]};padding:0 2px;color:{md["body"]}">'
+        f'停止基準は問題のスケールに依存してはならない</mark>。これは相対残差 '
+        f'<code style="background:{md["code-inline-bg"]};border-radius:3px;padding:1px 5px">'
+        f'norm(r) / norm(b)</code> を使う理由でもある。詳細は '
+        f'<a style="color:{md["link"]}">Saad (2003)</a> を参照。</p>'
+        f'<div style="border-left:3px solid {md["quote-border"]};color:{md["quote-text"]};'
+        f'padding-left:14px;margin:12px 0">丸め誤差により直交性が失われる場合、'
+        f'再直交化で回復できるがコストは増える。</div>'
+        f'<pre style="background:{md["code-block-bg"]};color:{syn["variable"]};margin:0">'
+        f'<span style="color:{syn["keyword"]}">if</span> res '
+        f'<span style="color:{syn["operator"]}">&lt;</span> '
+        f'<span style="color:{syn["number"]}">1e-12</span>:\n'
+        f'    <span style="color:{syn["keyword"]}">return</span> '
+        f'<span style="color:{syn["string"]}">"converged"</span>  '
+        f'<span style="color:{syn["comment"]};font-style:italic"># 相対残差で判定</span></pre>'
+        f'</div>')
+    return ''.join(h)
+
+
+# ============================================================
 # tokens.css (plan.md §7: palette.json から CSS variables を生成)
 # ============================================================
 
@@ -735,9 +871,13 @@ def gen_tokens_css(pal):
           f'  --lu-white: {pal["special"]["white"]};',
           f'  --lu-black: {pal["special"]["black"]};',
           f'  --lu-bg: {pal["bg"]["bg"]};',
-          f'  --lu-bg-2: {pal["bg"]["bg2"]};']
+          f'  --lu-bg-2: {pal["bg"]["bg2"]};',
+          f'  --lu-paper-bg: {pal["paper"]["bg"]};',
+          f'  --lu-paper-bg-2: {pal["paper"]["bg2"]};']
     for s in STEPS:
         ln.append(f'  --lu-base-{s}: {pal["base"][s]["hex"]};')
+    for s in STEPS:
+        ln.append(f'  --lu-pbase-{s}: {pal["paper"]["base"][s]["hex"]};')
     for n in ACCENTS:
         for s in STEPS:
             ln.append(f'  --lu-{n}-{s}: {pal["accents"][n][s]["hex"]};')
@@ -760,6 +900,7 @@ def gen_tokens_css(pal):
     block('[data-theme="light"]', ('light', 'light_high'))
     block('[data-theme="light"][data-contrast="quiet"]', ('light_quiet',))
     block('[data-theme="dark"]', ('dark',))
+    block('[data-theme="paper"]', ('paper',))
     return '\n'.join(ln) + '\n'
 
 
@@ -836,14 +977,23 @@ if __name__ == '__main__':
         f.write(html_roles(pal))
     with open(os.path.join(OUT, 'degrade.html'), 'w') as f:
         f.write(html_degrade(pal))
+    with open(os.path.join(OUT, 'paper.html'), 'w') as f:
+        f.write(html_paper(pal))
     with open(os.path.join(OUT, 'tokens.css'), 'w') as f:
         f.write(gen_tokens_css(pal))
 
     # コンソールに要約
-    print('generated: palette.json, out/{swatches,contrast,cvd,roles,degrade}.html, out/tokens.css')
+    print('generated: palette.json, out/{swatches,contrast,cvd,roles,degrade,paper}.html, '
+          'out/tokens.css')
     d = pal['bg']
     print(f"\n-- bg (確定) --\n  {d['bg']} (bg2 {d['bg2']}, "
           f"dE_white {d['dE_white']}, dE_paper {d['dE_paper']})")
+    p = pal['paper']
+    print(f"\n-- paper bg (確定 P2) --\n  {p['bg']} (bg2 {p['bg2']}, "
+          f"dE_bg {p['dE_bg']}, dE_white {p['dE_white']})")
+    for role in ('tx', 'tx-2', 'tx-3'):
+        hx = pal['roles']['paper'][role]['hex']
+        print(f"  {role:5s} {hx}  {wcag(hx, p['bg']):5.2f}:1  Lc {apca_lc(hx, p['bg']):+6.1f}")
     print('\n-- 600 step on bg: WCAG / APCA --')
     bgh = pal['bg']['bg']
     for n in ACCENTS:

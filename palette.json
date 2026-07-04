@@ -18,6 +18,123 @@
   "dE_white": 0.0116,
   "dE_paper": 0.0094
  },
+ "paper": {
+  "bg": "#F8F5EB",
+  "bg2": "#F0EDE1",
+  "oklch": [
+   0.97,
+   0.014,
+   92
+  ],
+  "dE_bg": 0.0219,
+  "dE_white": 0.0332,
+  "base": {
+   "50": {
+    "hex": "#F5F2E7",
+    "oklch": [
+     0.96,
+     0.014,
+     92
+    ]
+   },
+   "100": {
+    "hex": "#E8E4DB",
+    "oklch": [
+     0.92,
+     0.0136,
+     92
+    ]
+   },
+   "150": {
+    "hex": "#DAD7CE",
+    "oklch": [
+     0.88,
+     0.0131,
+     92
+    ]
+   },
+   "200": {
+    "hex": "#CDCAC1",
+    "oklch": [
+     0.84,
+     0.0127,
+     92
+    ]
+   },
+   "300": {
+    "hex": "#B4B1A9",
+    "oklch": [
+     0.76,
+     0.0118,
+     92
+    ]
+   },
+   "400": {
+    "hex": "#94928B",
+    "oklch": [
+     0.66,
+     0.0107,
+     92
+    ]
+   },
+   "500": {
+    "hex": "#7F7D77",
+    "oklch": [
+     0.59,
+     0.0099,
+     92
+    ]
+   },
+   "600": {
+    "hex": "#6E6C66",
+    "oklch": [
+     0.53,
+     0.0092,
+     92
+    ]
+   },
+   "700": {
+    "hex": "#5A5853",
+    "oklch": [
+     0.46,
+     0.0084,
+     92
+    ]
+   },
+   "800": {
+    "hex": "#464540",
+    "oklch": [
+     0.39,
+     0.0077,
+     92
+    ]
+   },
+   "850": {
+    "hex": "#3C3A36",
+    "oklch": [
+     0.35,
+     0.0072,
+     92
+    ]
+   },
+   "900": {
+    "hex": "#2F2E2A",
+    "oklch": [
+     0.3,
+     0.0067,
+     92
+    ]
+   },
+   "950": {
+    "hex": "#201F1C",
+    "oklch": [
+     0.24,
+     0.006,
+     92
+    ]
+   }
+  }
+ },
  "base": {
   "50": {
    "hex": "#F2F2F0",
@@ -1389,6 +1506,120 @@
    "magenta": {
     "ref": "hl-magenta",
     "hex": "#FFDDEC"
+   }
+  },
+  "paper": {
+   "bg": {
+    "ref": "paper-bg",
+    "hex": "#F8F5EB"
+   },
+   "bg-2": {
+    "ref": "paper-bg2",
+    "hex": "#F0EDE1"
+   },
+   "ui": {
+    "ref": "pbase-100",
+    "hex": "#E8E4DB"
+   },
+   "ui-2": {
+    "ref": "pbase-150",
+    "hex": "#DAD7CE"
+   },
+   "ui-3": {
+    "ref": "pbase-200",
+    "hex": "#CDCAC1"
+   },
+   "tx": {
+    "ref": "pbase-900",
+    "hex": "#2F2E2A"
+   },
+   "tx-2": {
+    "ref": "pbase-700",
+    "hex": "#5A5853"
+   },
+   "tx-3": {
+    "ref": "pbase-500",
+    "hex": "#7F7D77"
+   },
+   "link": {
+    "ref": "blue-600",
+    "hex": "#155FA6"
+   },
+   "link-hover": {
+    "ref": "blue-800",
+    "hex": "#023D72"
+   },
+   "visited": {
+    "ref": "purple-600",
+    "hex": "#5D409D"
+   },
+   "focus-ring": {
+    "ref": "blue-400",
+    "hex": "#4687CC"
+   }
+  },
+  "syntax_paper": {
+   "variable": {
+    "ref": "pbase-900",
+    "hex": "#2F2E2A"
+   },
+   "definition": {
+    "ref": "blue-600",
+    "hex": "#155FA6"
+   },
+   "keyword": {
+    "ref": "magenta-600",
+    "hex": "#A02F6E"
+   },
+   "string": {
+    "ref": "green-600",
+    "hex": "#678005"
+   },
+   "number": {
+    "ref": "purple-600",
+    "hex": "#5D409D"
+   },
+   "operator": {
+    "ref": "pbase-500",
+    "hex": "#7F7D77"
+   },
+   "comment": {
+    "ref": "pbase-400",
+    "hex": "#94928B"
+   }
+  },
+  "markdown_paper": {
+   "heading": {
+    "ref": "pbase-950",
+    "hex": "#201F1C"
+   },
+   "body": {
+    "ref": "pbase-900",
+    "hex": "#2F2E2A"
+   },
+   "link": {
+    "ref": "blue-600",
+    "hex": "#155FA6"
+   },
+   "code-inline-bg": {
+    "ref": "pbase-100",
+    "hex": "#E8E4DB"
+   },
+   "code-block-bg": {
+    "ref": "paper-bg2",
+    "hex": "#F0EDE1"
+   },
+   "quote-text": {
+    "ref": "pbase-700",
+    "hex": "#5A5853"
+   },
+   "quote-border": {
+    "ref": "pbase-200",
+    "hex": "#CDCAC1"
+   },
+   "hr": {
+    "ref": "pbase-150",
+    "hex": "#DAD7CE"
    }
   }
  }
