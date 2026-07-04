@@ -1,0 +1,27 @@
+{
+  "name": "lucretia-theme",
+  "displayName": "Lucretia",
+  "description": "Flexoki-inspired quiet color theme (sparse highlighting)",
+  "version": "0.1.0",
+  "publisher": "sugu",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Themes"
+  ],
+  "contributes": {
+    "themes": [
+      {
+        "label": "Lucretia Light",
+        "uiTheme": "vs",
+        "path": "./themes/lucretia-light-color-theme.json"
+      },
+      {
+        "label": "Lucretia Dark",
+        "uiTheme": "vs-dark",
+        "path": "./themes/lucretia-dark-color-theme.json"
+      }
+    ]
+  }
+}
