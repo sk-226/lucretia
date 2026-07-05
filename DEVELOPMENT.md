@@ -22,13 +22,17 @@ out/swatches.html     確定 bg のプレビュー / base スケール / アク�
 out/contrast.html     コントラスト行列（WCAG + APCA）+ 淡色帯 50–200 の塗り/文字検証
 out/cvd.html          P/D/T 型 (Machado 2009) シミュレーション + ペア ΔEok 行列
 out/roles.html        ロール表 + 用途モック（スライド / Markdown / コードエディタ / ギャラリー実写）
+out/overview.html     パレット一覧ツアー（palette / syntax / base / accents / extended / mappings）
+                      + light/dark/paper 比較（エディタ / Markdown / plot / ギャラリー / スライド）
 out/degrade.html      投影劣化シミュレーション（彩度低下 / ガンマ / 黒浮き）
 out/paper.html        lucretia paper（長文読書プロファイル §6.5）: 確定 bg プレビュー + 読書モック
 out/tokens.css        CSS variables（--lu-* パレット + data-theme/data-contrast ロール）
 scripts/build_dist.py 配布物生成（palette.json → dist/）
+scripts/plot_check.py chart-1..7 の matplotlib 検証プロット（要 numpy/matplotlib、手動実行）
 dist/vscode/          VS Code テーマ拡張（Light / Dark / Paper + ターミナル ANSI 16）
 dist/obsidian/        Obsidian CSS スニペット（読書用 lucretia-paper.css）
 assets/photos/        ギャラリーモック用の実写 3 枚（保存済み）
+assets/plots/         plot_check.py の生成 PNG（overview.html が参照。chart ロール変更時に再生成）
 ```
 
 ## 再生成

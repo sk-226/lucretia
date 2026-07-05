@@ -6,6 +6,7 @@ Outputs:
 - out/contrast.html : WCAG/APCA matrices and tint-step usage checks
 - out/cvd.html      : P/D/T simulations and pairwise ΔEok matrices
 - out/roles.html    : role tables plus slide, Markdown, editor, and gallery mocks
+- out/overview.html : tour of the palette and light/dark/paper comparisons
 - out/degrade.html  : simple projection/display degradation simulations
 - out/tokens.css    : CSS variables generated from palette.json
 
@@ -589,14 +590,241 @@ def html_cvd(pal):
 
 
 # ============================================================
+# Usage mocks shared by roles.html and overview.html
+# ============================================================
+# The sample copy in the mocks is committed under out/, so it stays generic
+# (no personal context). Filler sentences are proverbs rather than design
+# lectures: real words with rhythm, both scripts exercised, nobody preached at.
+
+MOCK_THEMES = ('light', 'dark', 'paper')
+
+
+def theme_ctx(pal, kind):
+    """Resolve the colors one mock theme needs: UI roles, syntax, markdown.
+
+    Dark has no markdown role group, so its markdown colors are derived from
+    the dark UI roles here, in the mock only; palette.json gains no new tokens.
+    """
+    R = {g: {k: v['hex'] for k, v in pal['roles'][g].items() if k != 'scrim'}
+         for g in pal['roles']}
+    if kind == 'light':
+        ui = {**R['light'], **R['light_high']}
+        syn, md = R['syntax_light'], R['markdown']
+        bg, bg2 = pal['bg']['bg'], pal['bg']['bg2']
+        sel = pal['accents']['blue'][150]['hex']
+        ansi = (600, 400)
+    elif kind == 'dark':
+        ui, syn = R['dark'], R['syntax_dark']
+        bg, bg2 = ui['bg'], ui['bg-2']
+        md = {'heading': ui['tx'], 'body': ui['tx'], 'link': ui['link'],
+              'code-inline-bg': ui['bg-2'], 'code-block-bg': ui['bg-2'],
+              'quote-text': ui['tx-2'], 'quote-border': ui['ui-3'],
+              'hr': ui['ui-2']}
+        sel = pal['accents']['blue'][850]['hex']
+        ansi = (300, 200)
+    else:  # paper
+        ui, syn, md = R['paper'], R['syntax_paper'], R['markdown_paper']
+        bg, bg2 = pal['paper']['bg'], pal['paper']['bg2']
+        sel = pal['accents']['blue'][150]['hex']
+        ansi = (600, 400)
+    return dict(kind=kind, ui=ui, syn=syn, md=md, bg=bg, bg2=bg2, sel=sel,
+                ansi=ansi, hl=R['highlight'],
+                name=f'Lucretia {kind.capitalize()}')
+
+
+def slide_mock(pal):
+    li = {k: v['hex'] for k, v in pal['roles']['light'].items()}
+    hi = {k: v['hex'] for k, v in pal['roles']['light_high'].items()}
+    pr = {k: v['hex'] for k, v in pal['roles']['presentation'].items()}
+    return (
+        f'<div style="width:640px;aspect-ratio:16/9;background:{li["bg"]};border:1px solid #DDD;'
+        f'border-radius:8px;padding:28px;box-sizing:border-box">'
+        f'<div style="font-size:22px;font-weight:700;color:{hi["tx"]}">'
+        f'Accessible Color Roles</div>'
+        f'<div style="font-size:12px;color:{hi["tx-2"]};margin:4px 0 14px">'
+        f'Public sample slide</div>'
+        f'<div style="font-size:14px;color:{hi["tx"]}">Body text, '
+        f'<b style="color:{pr["emphasis-1"]}">blue emphasis</b>, warnings, and notes '
+        f'each keep one fixed role. <b style="color:{pr["emphasis-2"]}">餅は餅屋</b> — '
+        f'leave rice cakes to the rice-cake maker, and each color to its own job.</div>'
+        f'<div style="background:{pr["note-fill"]};color:{pr["note-text"]};border-radius:6px;'
+        f'padding:8px 12px;margin:12px 0;font-size:13px">Warning: 覆水盆に返らず — '
+        f'spilled water does not return to the tray. Neither does a force-push.</div>'
+        f'<div style="background:{pr["info-fill"]};color:{pr["info-text"]};border-radius:6px;'
+        f'padding:8px 12px;font-size:13px">Note: 百聞は一見に如かず — '
+        f'one chart is worth a hundred status reports.</div>'
+        f'<div style="display:flex;gap:6px;align-items:center;margin-top:12px">'
+        f'<span style="font-size:11px;color:{hi["tx-2"]}">chart 1–7:</span>'
+        + ''.join(f'<span style="display:inline-block;width:34px;height:8px;border-radius:2px;'
+                  f'background:{pr[f"chart-{i}"]}" title="chart-{i}"></span>'
+                  for i in range(1, 8))
+        + '</div>'
+        f'<div style="margin-top:10px;font-size:11px;color:{hi["tx-3"]}">'
+        f'public preview / sample content</div></div>')
+
+
+def markdown_mock(pal, kind):
+    c = theme_ctx(pal, kind)
+    md, sl, hl = c['md'], c['syn'], c['hl']
+    # Highlighters carry black text only; light/paper body is already that ink.
+    mark_tx = pal['special']['black'] if kind == 'dark' else md['body']
+    border = f'1px solid {c["ui"]["ui-3"]}' if kind == 'dark' else '1px solid #DDD'
+    return (
+        f'<div style="display:inline-block;vertical-align:top;margin:8px;'
+        f'width:560px;box-sizing:border-box;background:{c["bg"]};border:{border};border-radius:8px;'
+        f'padding:20px 24px;color:{md["body"]};font-size:14px;line-height:1.7">'
+        f'<div style="font-size:19px;font-weight:700;color:{md["heading"]};'
+        f'border-bottom:1px solid {md["hr"]};padding-bottom:6px">Design Memo / デザインメモ '
+        f'<span style="font-weight:400;font-size:11px;color:{c["ui"]["tx-3"]}">({c["name"]})</span></div>'
+        f'<p>Separating links, body copy, and inline code keeps '
+        f'<code style="background:{md["code-inline-bg"]};border-radius:3px;'
+        f'padding:1px 5px">--color-accent</code> and other 短いトークン legible. '
+        f'See <a style="color:{md["link"]}">documentation</a> for details.</p>'
+        f'<p>Highlighters: '
+        f'<mark style="background:{hl["yellow"]};color:{mark_tx};padding:0 2px">default yellow</mark>, '
+        f'<mark style="background:{hl["green"]};color:{mark_tx};padding:0 2px">補助に緑</mark>、'
+        f'<mark style="background:{hl["blue"]};color:{mark_tx};padding:0 2px">'
+        f'<b>works under bold text</b></mark>, '
+        f'<mark style="background:{hl["red"]};color:{mark_tx};padding:0 2px">warning red</mark>. '
+        f'Black text only.</p>'
+        f'<div style="border-left:3px solid {md["quote-border"]};color:{md["quote-text"]};'
+        f'padding-left:12px;margin:10px 0">急がば回れ — when in a hurry, take the long way '
+        f'round. It is still faster than debugging the shortcut.</div>'
+        f'<pre style="background:{md["code-block-bg"]};color:{sl["variable"]};margin:0">'
+        f'<span style="color:{sl["keyword"]}">if</span> score <span style="color:{sl["operator"]}">&lt;</span> '
+        f'<span style="color:{sl["number"]}">0.8</span>:\n'
+        f'    <span style="color:{sl["keyword"]}">return</span> '
+        f'<span style="color:{sl["string"]}">"Needs review"</span></pre></div>')
+
+
+def editor_mock(pal, kind):
+    c = theme_ctx(pal, kind)
+    ui, syn = c['ui'], c['syn']
+    ebg, ebg2, sel = c['bg'], c['bg2'], c['sel']
+    tx, tx2, tx3 = ui['tx'], ui['tx-2'], ui['tx-3']
+    K = lambda t: f'<span style="color:{syn["keyword"]}">{t}</span>'
+    F = lambda t: f'<span style="color:{syn["definition"]}">{t}</span>'
+    S = lambda t: f'<span style="color:{syn["string"]}">{t}</span>'
+    N = lambda t: f'<span style="color:{syn["number"]}">{t}</span>'
+    O = lambda t: f'<span style="color:{syn["operator"]}">{t}</span>'
+    C = lambda t: f'<span style="color:{syn["comment"]};font-style:italic">{t}</span>'
+    # The sample touches every syntax role while staying domain-neutral.
+    # Variables remain tx; other token classes exercise their assigned hue.
+    lines = [
+        f'{K("import")} json',
+        '',
+        C('# Small UI model for the public preview (Tier 4 comment)'),
+        f'{K("class")} {F("ProductCard")}:',
+        f'    {S("&quot;&quot;&quot;Small data object used by the theme preview.&quot;&quot;&quot;")}',
+        f'    {K("def")} {F("__init__")}(self, title, price{O("=")}{N("29.0")}, '
+        f'featured{O("=")}{N("False")}):',
+        f'        self.title {O("=")} title',
+        f'        self.price {O("=")} price',
+        f'        self.featured {O("=")} featured',
+        f'        self.label {O("=")} {S("&quot;New&quot;")}',
+        '',
+        f'    {K("def")} {F("render")}(self, theme, discount{O("=")}{N("None")}):',
+        f'        ratio {O("=")} {N("1.0")} {K("if")} discount {K("is")} {N("None")} '
+        f'{K("else")} discount',
+        f'        total {O("=")} self.price {O("*")} ratio',
+        f'        {K("for")} index {K("in")} {F("range")}({N("3")}):',
+        f'            total {O("=")} total {O("+")} index {O("*")} {N("0.5")}',
+        f'            {K("if")} <span style="background:{sel}">total</span> {O("&lt;")} {N("20.0")}:',
+        f'                self.featured {O("=")} {N("True")}',
+        f'                {K("return")} theme.color({S("&quot;accent&quot;")}), total  ' + C('# sample branch'),
+        f'        {K("raise")} {F("ValueError")}({S("&quot;price is outside the preview range&quot;")})',
+    ]
+    hl_line = 15  # 0-origin current-line highlight for the sample loop.
+    rows = []
+    for i, ln in enumerate(lines):
+        lnc = tx2 if i == hl_line else tx3
+        lbg = f'background:{ebg2};' if i == hl_line else ''
+        rows.append(
+            f'<div style="display:flex;{lbg}">'
+            f'<span style="width:34px;text-align:right;padding-right:12px;'
+            f'color:{lnc};user-select:none;flex-shrink:0">{i + 1}</span>'
+            f'<span style="color:{tx};white-space:pre">{ln or " "}</span></div>')
+    # ANSI chips verify terminal colors next to the editor roles.
+    band_n, band_b = c['ansi']
+    ansi_chips = ''
+    for band, lab in ((band_n, 'normal'), (band_b, 'bright')):
+        ansi_chips += (f'<div style="display:flex;gap:4px;align-items:center;margin-top:4px">'
+                       f'<span style="color:{tx3};font-size:10px;width:44px">{lab}</span>'
+                       + ''.join(f'<span style="display:inline-block;width:30px;height:12px;'
+                                 f'border-radius:2px;background:'
+                                 f'{pal["accents"][cn][band]["hex"]}"></span>'
+                                 for cn in ('red', 'green', 'yellow', 'blue',
+                                            'magenta', 'cyan'))
+                       + '</div>')
+    return (
+        f'<div style="display:inline-block;vertical-align:top;margin:8px;width:560px;'
+        f'border:1px solid #CCC;border-radius:8px;overflow:hidden;'
+        f'font-family:ui-monospace,\'SF Mono\',Menlo,monospace;font-size:12px">'
+        # Tab bar.
+        f'<div style="display:flex;background:{ebg2};font-size:11px">'
+        f'<span style="background:{ebg};color:{tx};padding:6px 14px">product_card.py</span>'
+        f'<span style="color:{tx2};padding:6px 14px">theme_preview.py</span></div>'
+        # Editor body.
+        f'<div style="background:{ebg};padding:10px 0;line-height:1.65">{"".join(rows)}</div>'
+        # Terminal.
+        f'<div style="background:{ebg};border-top:1px solid {ui["ui-3"]};padding:8px 12px">'
+        f'<span style="color:{tx3};font-size:10px">TERMINAL (ANSI)</span>{ansi_chips}</div>'
+        # Status bar.
+        f'<div style="background:{ebg2};color:{tx2};font-size:10px;'
+        f'padding:4px 12px">{c["name"]} — Python · UTF-8 · Ln 16, Col 13</div>'
+        f'</div>')
+
+
+# CSS layered backgrounds keep the page robust when a checkout does not have
+# the photo fixtures. The captions stay generic so the committed preview does
+# not turn into a personal photo essay; the images only provide luminance and
+# color variation for checking the gallery roles.
+GALLERY_PHOTOS = [
+    ('../assets/photos/photo-1.jpg',
+     'linear-gradient(135deg,#7A8A99 0%,#C9B8A0 55%,#E8DCC8 100%)',
+     'Bright area / 明るい面 - black scrim 60%'),
+    ('../assets/photos/photo-2.jpg',
+     'linear-gradient(160deg,#0A0A0A 0%,#2E2E2E 60%,#6E6E6E 100%)',
+     'Dark area / 暗い面 - black scrim 60%'),
+    ('../assets/photos/photo-3.jpg',
+     'linear-gradient(160deg,#2E3B33 0%,#8A3B2E 60%,#B98F55 100%)',
+     'Colorful area / 多色面 - black scrim 60%'),
+]
+
+
+def gallery_card(pal, kind):
+    """One gallery mock card. Paper has no photo-surface role; its card uses
+    paper-bg and is labeled provisional (reading profile, plan.md §6.5)."""
+    sc = pal['roles']['gallery']['scrim']
+    ga = {k: v['hex'] for k, v in pal['roles']['gallery'].items() if k != 'scrim'}
+    c = theme_ctx(pal, kind)
+    if kind == 'paper':
+        surface, label = c['bg'], 'Paper (photo-surface = paper-bg, provisional)'
+    else:
+        role = pal['roles'][kind]['photo-surface']
+        surface, label = role['hex'], f'{kind.capitalize()} (photo-surface = {role["ref"]})'
+    h = [f'<div class="card" style="background:{surface};width:360px">'
+         f'<div style="color:{c["ui"]["tx"]};font-weight:600;margin-bottom:8px">{label}</div>']
+    for i, (src, fallback, cap) in enumerate(GALLERY_PHOTOS):
+        h.append(
+            f'<div style="background:url(\'{src}\') center/cover,{fallback};'
+            f'height:150px;border-radius:4px;position:relative;margin-top:{8 if i else 0}px">'
+            f'<div style="position:absolute;bottom:0;left:0;right:0;background:{sc["black"][60]};'
+            f'color:#FFF;font-size:11px;padding:5px 8px;border-radius:0 0 4px 4px">{cap}</div>'
+            f'<div style="position:absolute;top:6px;left:6px;background:{sc["black"][40]};'
+            f'color:#FFF;font-size:11px;padding:2px 8px;border-radius:3px">scrim 40%</div>'
+            f'</div>'
+            f'<div style="color:{ga["caption"]};font-size:12px;margin:4px 0 0">Caption / キャプション (caption)</div>'
+            f'<div style="color:{ga["meta"]};font-size:11px">f/8 · 1/250s · ISO 100 (meta)</div>')
+    h.append('</div>')
+    return ''.join(h)
+
+
+# ============================================================
 # roles.html (plan.md §6 role tables and usage mocks)
 # ============================================================
 
 def html_roles(pal):
-    R = {g: {k: v['hex'] for k, v in d.items() if k != 'scrim'}
-         for g, d in pal['roles'].items()}
-    li, hi, qu = R['light'], R['light_high'], R['light_quiet']
-    da, pr, md, sl = R['dark'], R['presentation'], R['markdown'], R['syntax_light']
     h = [f'<!doctype html><meta charset="utf-8"><title>roles</title><style>{CSS}</style>',
          '<h1>Role Mapping (Phase 3 Draft)</h1>',
          '<p class="small">plan.md §6. photo-surface and the dark gallery surface are provisional '
@@ -614,187 +842,346 @@ def html_roles(pal):
 
     # Slide mock.
     h.append('<h2>Mock 1: Slide (light_high + presentation)</h2>')
-    h.append(
-        f'<div style="width:640px;aspect-ratio:16/9;background:{li["bg"]};border:1px solid #DDD;'
-        f'border-radius:8px;padding:28px;box-sizing:border-box">'
-        f'<div style="font-size:22px;font-weight:700;color:{hi["tx"]}">'
-        f'Accessible Color Roles</div>'
-        f'<div style="font-size:12px;color:{hi["tx-2"]};margin:4px 0 14px">'
-        f'Public sample slide</div>'
-        f'<div style="font-size:14px;color:{hi["tx"]}">Body text, emphasis, warnings, and notes '
-        f'stay predictable when each <b style="color:{pr["emphasis-1"]}">visual role is fixed</b>. '
-        f'This mock keeps a Japanese check phrase: '
-        f'<b style="color:{pr["emphasis-2"]}">状態の優先度</b> は色だけで伝えない。</div>'
-        f'<div style="background:{pr["note-fill"]};color:{pr["note-text"]};border-radius:6px;'
-        f'padding:8px 12px;margin:12px 0;font-size:13px">Warning: do not rely on color alone / 色だけで伝えない</div>'
-        f'<div style="background:{pr["info-fill"]};color:{pr["info-text"]};border-radius:6px;'
-        f'padding:8px 12px;font-size:13px">Note: pair color with icons or short labels.</div>'
-        f'<div style="display:flex;gap:6px;align-items:center;margin-top:12px">'
-        f'<span style="font-size:11px;color:{hi["tx-2"]}">chart 1–7:</span>'
-        + ''.join(f'<span style="display:inline-block;width:34px;height:8px;border-radius:2px;'
-                  f'background:{pr[f"chart-{i}"]}" title="chart-{i}"></span>'
-                  for i in range(1, 8))
-        + '</div>'
-        f'<div style="margin-top:10px;font-size:11px;color:{hi["tx-3"]}">'
-        f'public preview / sample content</div></div>')
+    h.append(slide_mock(pal))
 
     # Markdown mock.
     h.append('<h2>Mock 2: Markdown Editor (light_high + markdown)</h2>')
-    h.append(
-        f'<div style="width:560px;background:{li["bg"]};border:1px solid #DDD;border-radius:8px;'
-        f'padding:20px 24px;color:{md["body"]};font-size:14px;line-height:1.7">'
-        f'<div style="font-size:19px;font-weight:700;color:{md["heading"]};'
-        f'border-bottom:1px solid {md["hr"]};padding-bottom:6px">Design Memo / デザインメモ</div>'
-        f'<p>Separating links, body copy, and inline code keeps '
-        f'<code style="background:{md["code-inline-bg"]};border-radius:3px;'
-        f'padding:1px 5px">--color-accent</code> and other 短いトークン legible. '
-        f'See <a style="color:{md["link"]}">documentation</a> for details.</p>'
-        f'<p>Highlighters: '
-        f'<mark style="background:{R["highlight"]["yellow"]};padding:0 2px">default yellow</mark>, '
-        f'<mark style="background:{R["highlight"]["green"]};padding:0 2px">補助に緑</mark>、'
-        f'<mark style="background:{R["highlight"]["blue"]};padding:0 2px">'
-        f'<b>works under bold text</b></mark>, '
-        f'<mark style="background:{R["highlight"]["red"]};padding:0 2px">warning red</mark>. '
-        f'Black text only.</p>'
-        f'<div style="border-left:3px solid {md["quote-border"]};color:{md["quote-text"]};'
-        f'padding-left:12px;margin:10px 0">重要な状態は色だけでなく、ラベルでも示す。</div>'
-        f'<pre style="background:{md["code-block-bg"]};color:{sl["variable"]};margin:0">'
-        f'<span style="color:{sl["keyword"]}">if</span> score <span style="color:{sl["operator"]}">&lt;</span> '
-        f'<span style="color:{sl["number"]}">0.8</span>:\n'
-        f'    <span style="color:{sl["keyword"]}">return</span> '
-        f'<span style="color:{sl["string"]}">"Needs review"</span></pre></div>')
+    h.append(markdown_mock(pal, 'light'))
 
     # Code editor mock.
     h.append('<h2>Mock 3: Code Editor (syntax_light / syntax_dark + dist/vscode equivalent)</h2>'
              '<p class="small">§6.3 sparse highlighting: variables and calls stay neutral (Tier 1); '
              'only keywords = magenta, definitions = blue, strings = green, and numbers = purple receive hue. '
              'The lower band shows terminal ANSI colors (normal / bright).</p>')
-
-    def editor_mock(kind):
-        light = kind == 'light'
-        ui = {**R['light'], **R['light_high']} if light else R['dark']
-        syn = R['syntax_light'] if light else R['syntax_dark']
-        ebg = pal['bg']['bg'] if light else ui['bg']
-        ebg2 = pal['bg']['bg2'] if light else ui['bg-2']
-        sel = pal['accents']['blue'][150 if light else 850]['hex']
-        tx, tx2, tx3 = ui['tx'], ui['tx-2'], ui['tx-3']
-        K = lambda t: f'<span style="color:{syn["keyword"]}">{t}</span>'
-        F = lambda t: f'<span style="color:{syn["definition"]}">{t}</span>'
-        S = lambda t: f'<span style="color:{syn["string"]}">{t}</span>'
-        N = lambda t: f'<span style="color:{syn["number"]}">{t}</span>'
-        O = lambda t: f'<span style="color:{syn["operator"]}">{t}</span>'
-        C = lambda t: f'<span style="color:{syn["comment"]};font-style:italic">{t}</span>'
-        # The sample touches every syntax role while staying domain-neutral.
-        # Variables remain tx; other token classes exercise their assigned hue.
-        lines = [
-            f'{K("import")} json',
-            '',
-            C('# Small UI model for the public preview (Tier 4 comment)'),
-            f'{K("class")} {F("ProductCard")}:',
-            f'    {S("&quot;&quot;&quot;Small data object used by the theme preview.&quot;&quot;&quot;")}',
-            f'    {K("def")} {F("__init__")}(self, title, price{O("=")}{N("29.0")}, '
-            f'featured{O("=")}{N("False")}):',
-            f'        self.title {O("=")} title',
-            f'        self.price {O("=")} price',
-            f'        self.featured {O("=")} featured',
-            f'        self.label {O("=")} {S("&quot;New&quot;")}',
-            '',
-            f'    {K("def")} {F("render")}(self, theme, discount{O("=")}{N("None")}):',
-            f'        ratio {O("=")} {N("1.0")} {K("if")} discount {K("is")} {N("None")} '
-            f'{K("else")} discount',
-            f'        total {O("=")} self.price {O("*")} ratio',
-            f'        {K("for")} index {K("in")} {F("range")}({N("3")}):',
-            f'            total {O("=")} total {O("+")} index {O("*")} {N("0.5")}',
-            f'            {K("if")} <span style="background:{sel}">total</span> {O("&lt;")} {N("20.0")}:',
-            f'                self.featured {O("=")} {N("True")}',
-            f'                {K("return")} theme.color({S("&quot;accent&quot;")}), total  ' + C('# sample branch'),
-            f'        {K("raise")} {F("ValueError")}({S("&quot;price is outside the preview range&quot;")})',
-        ]
-        hl_line = 15  # 0-origin current-line highlight for the sample loop.
-        rows = []
-        for i, ln in enumerate(lines):
-            lnc = tx2 if i == hl_line else tx3
-            lbg = f'background:{ebg2};' if i == hl_line else ''
-            rows.append(
-                f'<div style="display:flex;{lbg}">'
-                f'<span style="width:34px;text-align:right;padding-right:12px;'
-                f'color:{lnc};user-select:none;flex-shrink:0">{i + 1}</span>'
-                f'<span style="color:{tx};white-space:pre">{ln or " "}</span></div>')
-        # ANSI chips verify terminal colors next to the editor roles.
-        band_n, band_b = (600, 400) if light else (300, 200)
-        ansi_chips = ''
-        for band, lab in ((band_n, 'normal'), (band_b, 'bright')):
-            ansi_chips += (f'<div style="display:flex;gap:4px;align-items:center;margin-top:4px">'
-                           f'<span style="color:{tx3};font-size:10px;width:44px">{lab}</span>'
-                           + ''.join(f'<span style="display:inline-block;width:30px;height:12px;'
-                                     f'border-radius:2px;background:'
-                                     f'{pal["accents"][c][band]["hex"]}"></span>'
-                                     for c in ('red', 'green', 'yellow', 'blue',
-                                               'magenta', 'cyan'))
-                           + '</div>')
-        name = f'Lucretia {"Light" if light else "Dark"}'
-        return (
-            f'<div style="display:inline-block;vertical-align:top;margin:8px;width:560px;'
-            f'border:1px solid #CCC;border-radius:8px;overflow:hidden;'
-            f'font-family:ui-monospace,\'SF Mono\',Menlo,monospace;font-size:12px">'
-            # Tab bar.
-            f'<div style="display:flex;background:{ebg2};font-size:11px">'
-            f'<span style="background:{ebg};color:{tx};padding:6px 14px">product_card.py</span>'
-            f'<span style="color:{tx2};padding:6px 14px">theme_preview.py</span></div>'
-            # Editor body.
-            f'<div style="background:{ebg};padding:10px 0;line-height:1.65">{"".join(rows)}</div>'
-            # Terminal.
-            f'<div style="background:{ebg};border-top:1px solid {ui["ui-3"]};padding:8px 12px">'
-            f'<span style="color:{tx3};font-size:10px">TERMINAL (ANSI)</span>{ansi_chips}</div>'
-            # Status bar.
-            f'<div style="background:{ebg2};color:{tx2};font-size:10px;'
-            f'padding:4px 12px">{name} — Python · UTF-8 · Ln 16, Col 13</div>'
-            f'</div>')
-
-    h.append(editor_mock('light'))
-    h.append(editor_mock('dark'))
+    h.append(editor_mock(pal, 'light'))
+    h.append(editor_mock(pal, 'dark'))
 
     # Gallery mock.
     h.append('<h2>Mock 4: Gallery (photo-surface + scrim)</h2>'
              '<p class="small">Uses real photos to check photo-adjacent surfaces and scrims across '
              'bright, dark, and colorful image areas (plan.md §6.4).</p>')
-    # CSS layered backgrounds keep the page robust when a checkout does not have
-    # the photo fixtures. The captions stay generic so the committed preview does
-    # not turn into a personal photo essay; the images only provide luminance and
-    # color variation for checking the gallery roles.
-    photos = [
-        ('../assets/photos/photo-1.jpg',
-         'linear-gradient(135deg,#7A8A99 0%,#C9B8A0 55%,#E8DCC8 100%)',
-         'Bright area / 明るい面 - black scrim 60%'),
-        ('../assets/photos/photo-2.jpg',
-         'linear-gradient(160deg,#0A0A0A 0%,#2E2E2E 60%,#6E6E6E 100%)',
-         'Dark area / 暗い面 - black scrim 60%'),
-        ('../assets/photos/photo-3.jpg',
-         'linear-gradient(160deg,#2E3B33 0%,#8A3B2E 60%,#B98F55 100%)',
-         'Colorful area / 多色面 - black scrim 60%'),
-    ]
-    sc = pal['roles']['gallery']['scrim']
-    ga = R['gallery']
-    ps_l = pal['roles']['light']['photo-surface']['ref']
-    ps_d = pal['roles']['dark']['photo-surface']['ref']
-    for label, surface, txc in ((f'Light (photo-surface = {ps_l})', li['photo-surface'], hi),
-                                (f'Dark (photo-surface = {ps_d})', da['photo-surface'],
-                                 {'tx': da['tx'], 'tx-2': da['tx-2'], 'tx-3': da['tx-3']})):
-        h.append(
-            f'<div class="card" style="background:{surface};width:360px">'
-            f'<div style="color:{txc["tx"]};font-weight:600;margin-bottom:8px">{label}</div>')
-        for i, (src, fallback, cap) in enumerate(photos):
-            h.append(
-                f'<div style="background:url(\'{src}\') center/cover,{fallback};'
-                f'height:150px;border-radius:4px;position:relative;margin-top:{8 if i else 0}px">'
-                f'<div style="position:absolute;bottom:0;left:0;right:0;background:{sc["black"][60]};'
-                f'color:#FFF;font-size:11px;padding:5px 8px;border-radius:0 0 4px 4px">{cap}</div>'
-                f'<div style="position:absolute;top:6px;left:6px;background:{sc["black"][40]};'
-                f'color:#FFF;font-size:11px;padding:2px 8px;border-radius:3px">scrim 40%</div>'
-                f'</div>'
-                f'<div style="color:{ga["caption"]};font-size:12px;margin:4px 0 0">Caption / キャプション (caption)</div>'
-                f'<div style="color:{ga["meta"]};font-size:11px">f/8 · 1/250s · ISO 100 (meta)</div>')
-        h.append('</div>')
+    h.append(gallery_card(pal, 'light'))
+    h.append(gallery_card(pal, 'dark'))
+    return ''.join(h)
+
+
+# ============================================================
+# overview.html (tour of the palette + theme comparisons)
+# ============================================================
+PALETTE_ROLE_ORDER = ('bg', 'bg-2', 'ui', 'ui-2', 'ui-3', 'tx-3', 'tx-2', 'tx')
+
+# Short factual usage notes for the mapping tables.
+UI_USAGE = [
+    ('bg', 'Page background'), ('bg-2', 'Panels, code blocks'),
+    ('card', 'Raised cards'), ('ui', 'Borders'),
+    ('ui-2', 'Hovered borders'), ('ui-3', 'Active borders'),
+    ('tx', 'Body text'), ('tx-2', 'Secondary text'),
+    ('tx-3', 'Faint text, placeholders'),
+    ('link', 'Links'), ('link-hover', 'Hovered links'),
+    ('visited', 'Visited links'), ('focus-ring', 'Focus outline'),
+    ('photo-surface', 'Surface behind photos'),
+]
+SYNTAX_USAGE = [
+    ('variable', 'Variables, plain code (Tier 1)'),
+    ('definition', 'Function / class definitions'),
+    ('keyword', 'Keywords'),
+    ('string', 'Strings'),
+    ('number', 'Numbers, constants'),
+    ('operator', 'Operators, punctuation'),
+    ('comment', 'Comments'),
+]
+MARKDOWN_USAGE = [
+    ('heading', 'Headings'), ('body', 'Body copy'), ('link', 'Links'),
+    ('code-inline-bg', 'Inline code background'),
+    ('code-block-bg', 'Code block background'),
+    ('quote-text', 'Quote text'), ('quote-border', 'Quote border'),
+    ('hr', 'Rules, dividers'),
+]
+PRESENTATION_USAGE = ([
+    ('emphasis-1', 'Primary emphasis (bold)'),
+    ('emphasis-2', 'Warning emphasis (bold)'),
+    ('sub-1', 'Secondary accent'), ('sub-2', 'Secondary accent'),
+    ('sub-3', 'Secondary accent (large/bold only)'),
+    ('note-fill', 'Warning box fill'), ('note-text', 'Warning box text'),
+    ('info-fill', 'Info box fill'), ('info-text', 'Info box text'),
+] + [(f'chart-{i}', f'Chart series {i}') for i in range(1, 8)])
+
+# Dark markdown values are borrowed from the dark UI roles (see theme_ctx).
+MD_DARK_DERIVED = {'heading': 'tx', 'body': 'tx', 'link': 'link',
+                   'code-inline-bg': 'bg-2', 'code-block-bg': 'bg-2',
+                   'quote-text': 'tx-2', 'quote-border': 'ui-3', 'hr': 'ui-2'}
+
+
+def color_cell(name, hexv):
+    """Swatch cell: the color as background with only the name inside.
+    Hex/RGB/OKLCH stay in their own columns (or in the §3-§5 value tables)."""
+    return (f'<td style="background:{hexv};color:{text_color_for(hexv)};'
+            f'min-width:86px">{name}</td>')
+
+
+def rgb_label(hexv):
+    return ', '.join(str(c) for c in hex_to_rgb(hexv))
+
+
+def value_cells(pal, ref):
+    hexv = resolve_ref(pal, ref)
+    return (f'<td>{hexv}</td><td>{rgb_label(hexv)}</td>'
+            f'<td>{oklch_label(pal, ref)}</td>')
+
+
+VALUE_HEADERS = '<th>Hex</th><th>RGB</th><th>OKLCH (L / C / H)</th>'
+
+
+def oklch_for(pal, ref):
+    """Stored design OKLCH for a palette reference. Recomputing from hex would
+    show jittery hue on near-neutrals (quantization flips H by tens of degrees),
+    so display uses the generation parameters instead."""
+    if ref == 'white':
+        return (1.0, 0.0, None)
+    if ref == 'black':
+        return (BLACK_L, BLACK_C, 97)
+    if ref in ('bg', 'bg2'):
+        L, C, H = pal['bg']['oklch']
+    elif ref in ('paper-bg', 'paper-bg2'):
+        L, C, H = pal['paper']['oklch']
+    else:
+        if ref.startswith('hl-'):
+            return tuple(pal['highlight'][ref[3:]]['oklch'])
+        name, step = ref.rsplit('-', 1)
+        scale = (pal['base'] if name == 'base'
+                 else pal['paper']['base'] if name == 'pbase'
+                 else pal['accents'][name])
+        return tuple(scale[int(step)]['oklch'])
+    if ref.endswith('2'):
+        L, C = L + BG2_OFFSET[0], C + BG2_OFFSET[1]
+    return (L, C, H)
+
+
+def oklch_label(pal, ref):
+    L, C, H = oklch_for(pal, ref)
+    hue = '—' if H is None else f'{H:.0f}°'
+    return f'{L:.2f} / {C:.3f} / {hue}'
+
+
+def ref_role_map(pal, groups):
+    """Reverse map: palette reference -> role names within the given groups."""
+    m = {}
+    for g in groups:
+        for k, v in pal['roles'][g].items():
+            if not isinstance(v, dict) or 'ref' not in v:
+                continue  # gallery scrim steps have no single ref
+            m.setdefault(v['ref'], []).append(k)
+    return m
+
+
+def palette_strip(pal, kind):
+    """Palette figure: the role strip plus the profile's accent band."""
+    c = theme_ctx(pal, kind)
+    ui = c['ui']
+    band = 300 if kind == 'dark' else 600
+    edge = ui['ui-2']
+
+    def sw(hexv, label):
+        return (f'<div style="width:60px;text-align:center;font-size:9.5px">'
+                f'<div style="height:44px;border-radius:7px;background:{hexv};'
+                f'box-shadow:inset 0 0 0 1px {edge}"></div>'
+                f'<div style="color:{ui["tx-2"]};margin-top:3px">{label}</div>'
+                f'<div style="color:{ui["tx-3"]}">{hexv}</div></div>')
+
+    roles_row = ''.join(sw(ui[r], r) for r in PALETTE_ROLE_ORDER)
+    accent_row = ''.join(sw(pal['accents'][n][band]['hex'], f'{n}-{band}')
+                         for n in ACCENTS)
+    return (f'<div style="background:{c["bg"]};border:1px solid #DDD;border-radius:10px;'
+            f'padding:16px 18px;margin:10px 0;max-width:560px">'
+            f'<div style="color:{ui["tx"]};font-weight:600;font-size:13px;margin-bottom:10px">'
+            f'{c["name"]}</div>'
+            f'<div style="display:flex;gap:6px;flex-wrap:wrap">{roles_row}</div>'
+            f'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">{accent_row}</div>'
+            f'</div>')
+
+
+def html_overview(pal):
+    h = [f'<!doctype html><meta charset="utf-8"><title>overview</title><style>{CSS}</style>',
+         '<h1>Lucretia — Palette Overview</h1>',
+         '<p class="small">A tour of the palette '
+         '(palette / syntax highlighting / base color / accent colors / extended palette / mappings) '
+         'for the three Lucretia profiles: Light, Dark, and Paper (long-form reading). '
+         'Source of truth: build.py ROLES → palette.json. '
+         'Lucretia is inspired by Flexoki; see THIRD_PARTY_NOTICES.md.</p>']
+
+    # 1. Palette.
+    h.append('<h2>1. Palette</h2>'
+             '<p class="small">Role strip (bg → tx) plus the 8 accents in each profile\'s main band: '
+             'Light and Paper center on the 600 band, Dark on the 300 band '
+             '(strings alone use green-400).</p>')
+    h.append('<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start">'
+             + ''.join(palette_strip(pal, k) for k in MOCK_THEMES) + '</div>')
+
+    # 2. Syntax highlighting.
+    h.append('<h2>2. Syntax Highlighting — Code Editor</h2>'
+             '<p class="small">§6.3 sparse highlighting in all three profiles: variables stay neutral; '
+             'keywords = magenta, definitions = blue, strings = green, numbers = purple. '
+             'The lower band shows terminal ANSI colors (normal / bright).</p>')
+    for kind in MOCK_THEMES:
+        h.append(editor_mock(pal, kind))
+    h.append('<h2>2b. Syntax Highlighting — Markdown</h2>'
+             '<p class="small">markdown (light), markdown_paper (paper), and a dark variant derived '
+             'from the dark UI roles (no extra tokens; see §6.3 mapping table).</p>')
+    for kind in MOCK_THEMES:
+        h.append(markdown_mock(pal, kind))
+
+    # 3. Base colors.
+    lmap = ref_role_map(pal, ('light', 'light_high'))
+    qmap = ref_role_map(pal, ('light_quiet',))
+    dmap = ref_role_map(pal, ('dark',))
+    pmap = ref_role_map(pal, ('paper',))
+
+    def role_names(m, ref, quiet=None):
+        # Deduplicate: the same role name may come from several groups
+        # (e.g. 'link' exists in both the UI and the markdown group).
+        names = list(dict.fromkeys(m.get(ref, [])))
+        if quiet:
+            names += [f'{k} (quiet)' for k in quiet.get(ref, [])]
+        return ', '.join(names) or '—'
+
+    h.append('<h2>3. Base Colors</h2>'
+             '<p class="small">The neutral scale serves Light and Dark; Paper uses the warm pbase '
+             'scale (H=92) because the neutral base looks bluish on the warm page. '
+             'Role columns list UI roles; syntax and markdown mappings are in §6.</p>')
+    h.append(f'<table><tr><th>Color</th>{VALUE_HEADERS}'
+             '<th>Light role</th><th>Dark role</th></tr>')
+    for ref in ['white', 'bg', 'bg2'] + [f'base-{s}' for s in STEPS] + ['black']:
+        h.append(f'<tr>{color_cell(ref, resolve_ref(pal, ref))}{value_cells(pal, ref)}'
+                 f'<td>{role_names(lmap, ref, qmap)}</td>'
+                 f'<td>{role_names(dmap, ref)}</td></tr>')
+    h.append('</table>')
+    h.append('<h3>Paper base (pbase, warm)</h3>')
+    h.append(f'<table><tr><th>Color</th>{VALUE_HEADERS}<th>Paper role</th></tr>')
+    for ref in ['paper-bg', 'paper-bg2'] + [f'pbase-{s}' for s in STEPS]:
+        h.append(f'<tr>{color_cell(ref, resolve_ref(pal, ref))}{value_cells(pal, ref)}'
+                 f'<td>{role_names(pmap, ref)}</td></tr>')
+    h.append('</table>')
+
+    # 4. Accent colors.
+    l_use = ref_role_map(pal, ('light', 'syntax_light', 'markdown', 'presentation'))
+    p_use = ref_role_map(pal, ('paper', 'syntax_paper', 'markdown_paper'))
+    d_use = ref_role_map(pal, ('dark', 'syntax_dark'))
+    h.append('<h2>4. Accent Colors</h2>'
+             '<p class="small">Light and Paper draw text accents from the 600 band; Dark from the '
+             '300 band. Tint fills (50–200), tint text (800), and chart bands (300–500) appear '
+             'in §6 mappings.</p>')
+    h.append(f'<h3>600 band (Light / Paper)</h3>'
+             f'<table><tr><th>Color</th>{VALUE_HEADERS}'
+             '<th>Light usage</th><th>Paper usage</th></tr>')
+    for n in ACCENTS:
+        ref = f'{n}-600'
+        h.append(f'<tr>{color_cell(ref, resolve_ref(pal, ref))}{value_cells(pal, ref)}'
+                 f'<td>{role_names(l_use, ref)}</td><td>{role_names(p_use, ref)}</td></tr>')
+    h.append('</table><p class="small">The full 600 band also serves as the light/paper '
+             'terminal ANSI normal band; 400 is the bright band (dist/vscode).</p>')
+    h.append(f'<h3>300 band (Dark)</h3>'
+             f'<table><tr><th>Color</th>{VALUE_HEADERS}<th>Dark usage</th></tr>')
+    for ref in [f'{n}-300' for n in ACCENTS] + ['green-400']:
+        h.append(f'<tr>{color_cell(ref, resolve_ref(pal, ref))}{value_cells(pal, ref)}'
+                 f'<td>{role_names(d_use, ref)}</td></tr>')
+    h.append('</table><p class="small">The full 300 band also serves as the dark terminal '
+             'ANSI normal band; 200 is the bright band (dist/vscode). Chart series and tint '
+             'fills draw on other steps; see §6.4.</p>')
+
+    # 5. Extended palette.
+    h.append('<h2>5. Extended Palette</h2>'
+             '<p class="small">13 steps per scale (50–950). '
+             'Highlighters (hl-*) are a separate marker band for black text only.</p>')
+    h.append('<h3>base</h3><div>' + chip(pal['special']['white'], 'white')
+             + ''.join(chip(pal['base'][s]['hex'], f'{s}') for s in STEPS)
+             + chip(pal['special']['black'], 'black') + '</div>')
+    h.append('<h3>pbase (paper)</h3><div>' + chip(pal['paper']['bg'], 'paper-bg')
+             + ''.join(chip(pal['paper']['base'][s]['hex'], f'{s}') for s in STEPS) + '</div>')
+    for n in ACCENTS:
+        h.append(f'<h3>{n}</h3><div>'
+                 + ''.join(chip(pal['accents'][n][s]['hex'], f'{s}') for s in STEPS) + '</div>')
+    h.append('<h3>highlighters</h3><div>'
+             + ''.join(chip(pal['highlight'][n]['hex'], f'hl-{n}') for n in ACCENTS) + '</div>')
+
+    # 6. Mappings. Cells name the token only; look values up in §3-§5.
+    def cellv(v):
+        return color_cell(v['ref'], v['hex']) if v else '<td>—</td>'
+
+    h.append('<h2>6. Mappings</h2>')
+    h.append('<h3>6.1 UI roles</h3>'
+             '<table><tr><th>Role</th><th>Usage</th><th>Light</th><th>Dark</th><th>Paper</th></tr>')
+    for role, usage in UI_USAGE:
+        lv = pal['roles']['light'].get(role) or pal['roles']['light_high'].get(role)
+        h.append(f'<tr><td>{role}</td><td style="text-align:left">{usage}</td>'
+                 + cellv(lv) + cellv(pal['roles']['dark'].get(role))
+                 + cellv(pal['roles']['paper'].get(role)) + '</tr>')
+    quiet = ', '.join(f'{k} = {v["ref"]}' for k, v in pal['roles']['light_quiet'].items())
+    h.append(f'</table><p class="small">Light quiet text profile: {quiet}. '
+             'Paper has no photo-surface: the reading profile is not meant for galleries.</p>')
+
+    h.append('<h3>6.2 Syntax roles</h3>'
+             '<table><tr><th>Role</th><th>Usage</th><th>Light</th><th>Dark</th><th>Paper</th></tr>')
+    for role, usage in SYNTAX_USAGE:
+        h.append(f'<tr><td>{role}</td><td style="text-align:left">{usage}</td>'
+                 + cellv(pal['roles']['syntax_light'].get(role))
+                 + cellv(pal['roles']['syntax_dark'].get(role))
+                 + cellv(pal['roles']['syntax_paper'].get(role)) + '</tr>')
+    h.append('</table>')
+
+    h.append('<h3>6.3 Markdown roles</h3>'
+             '<table><tr><th>Role</th><th>Usage</th><th>Light</th><th>Dark (derived)</th>'
+             '<th>Paper</th></tr>')
+    for role, usage in MARKDOWN_USAGE:
+        dv = pal['roles']['dark'][MD_DARK_DERIVED[role]]
+        h.append(f'<tr><td>{role}</td><td style="text-align:left">{usage}</td>'
+                 + cellv(pal['roles']['markdown'].get(role))
+                 + color_cell(f'{dv["ref"]} (= {MD_DARK_DERIVED[role]})', dv['hex'])
+                 + cellv(pal['roles']['markdown_paper'].get(role)) + '</tr>')
+    h.append('</table><p class="small">Dark markdown borrows dark UI roles in the mocks; '
+             'palette.json defines no separate markdown_dark group.</p>')
+
+    h.append('<h3>6.4 Presentation roles (Light only)</h3>'
+             '<table><tr><th>Role</th><th>Usage</th><th>Token</th></tr>')
+    for role, usage in PRESENTATION_USAGE:
+        h.append(f'<tr><td>{role}</td><td style="text-align:left">{usage}</td>'
+                 + cellv(pal['roles']['presentation'].get(role)) + '</tr>')
+    h.append('</table>')
+
+    h.append(f'<h3>6.5 Highlighters (all profiles)</h3>'
+             f'<table><tr><th>Color</th><th>Usage</th>{VALUE_HEADERS}</tr>')
+    for n in ACCENTS:
+        ref = f'hl-{n}'
+        h.append(f'<tr>{color_cell(ref, resolve_ref(pal, ref))}'
+                 f'<td style="text-align:left">Marker behind black text</td>'
+                 f'{value_cells(pal, ref)}</tr>')
+    h.append('</table>')
+
+    # 7. Plot.
+    h.append('<h2>7. Plot — chart-1..7 in practice</h2>'
+             '<p class="small">Generated by scripts/plot_check.py (matplotlib; PNGs committed under '
+             'assets/plots/). The same seven series on the light bg, the paper bg, and MATLAB '
+             'default axes as a reference.</p>')
+    for name, cap in (('lucretia_light', 'Light bg #FDFCF7, horizontal grid only'),
+                      ('lucretia_paper', 'Paper bg #F8F5EB, horizontal grid only'),
+                      ('matlab_default', 'MATLAB default axes (reference)')):
+        h.append(f'<div style="display:inline-block;vertical-align:top;margin:8px">'
+                 f'<img src="../assets/plots/{name}.png" alt="{name}" '
+                 f'style="width:560px;border:1px solid #DDD;border-radius:8px;display:block">'
+                 f'<div class="small" style="margin-top:2px">{cap}</div></div>')
+
+    # 8. Gallery.
+    h.append('<h2>8. Gallery — Light / Dark / Paper</h2>'
+             '<p class="small">photo-surface + scrims over bright, dark, and colorful image areas '
+             '(plan.md §6.4). The paper card is provisional: the reading profile has no '
+             'photo-surface role.</p>')
+    for kind in MOCK_THEMES:
+        h.append(gallery_card(pal, kind))
+
+    # 9. Slide.
+    h.append('<h2>9. Slide</h2>'
+             '<p class="small">The current light slide mock (light_high + presentation), '
+             'unchanged from roles.html.</p>')
+    h.append(slide_mock(pal))
     return ''.join(h)
 
 
@@ -871,8 +1258,8 @@ def html_paper(pal):
         f'line-height</code> and spacing: it makes rereading easier. See '
         f'<a style="color:{md["link"]}">reading notes</a> for details.</p>'
         f'<div style="border-left:3px solid {md["quote-border"]};color:{md["quote-text"]};'
-        f'padding-left:14px;margin:12px 0">Quotes and side notes sit one step below the body copy '
-        f'so they do not interrupt long paragraphs.</div>'
+        f'padding-left:14px;margin:12px 0">読書百遍、義自ずから見る — read it a hundred '
+        f'times and the meaning reveals itself. A calm page makes the other ninety-nine easier.</div>'
         f'<pre style="background:{md["code-block-bg"]};color:{syn["variable"]};margin:0">'
         f'<span style="color:{syn["keyword"]}">if</span> contrast '
         f'<span style="color:{syn["operator"]}">&lt;</span> '
@@ -998,6 +1385,8 @@ if __name__ == '__main__':
         f.write(html_cvd(pal))
     with open(os.path.join(OUT, 'roles.html'), 'w') as f:
         f.write(html_roles(pal))
+    with open(os.path.join(OUT, 'overview.html'), 'w') as f:
+        f.write(html_overview(pal))
     with open(os.path.join(OUT, 'degrade.html'), 'w') as f:
         f.write(html_degrade(pal))
     with open(os.path.join(OUT, 'paper.html'), 'w') as f:
@@ -1006,7 +1395,7 @@ if __name__ == '__main__':
         f.write(gen_tokens_css(pal))
 
     # Console output is intentionally compact so regeneration can be checked by eye.
-    print('generated: palette.json, out/{swatches,contrast,cvd,roles,degrade,paper}.html, '
+    print('generated: palette.json, out/{swatches,contrast,cvd,roles,overview,degrade,paper}.html, '
           'out/tokens.css')
     d = pal['bg']
     print(f"\n-- bg (final) --\n  {d['bg']} (bg2 {d['bg2']}, "

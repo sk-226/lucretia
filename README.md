@@ -7,6 +7,16 @@ with roles for presentations, Markdown, code editors, and photo-forward web UIs.
 The palette stays inside sRGB and is checked with OKLCH, WCAG 2.x, APCA, and CVD simulations.
 Final decisions still prioritize how the theme feels in actual reading, projection, code, and image-heavy layouts.
 
+## Preview
+
+Exported from `out/overview.html`.
+
+![Lucretia palette overview](assets/previews/overview-palette.png)
+
+![Lucretia syntax highlighting code editor preview](assets/previews/overview-code-editor.png)
+
+![Lucretia slide preview](assets/previews/overview-slide.png)
+
 ## Contents
 
 - `palette.json`: generated palette and role mappings
@@ -17,8 +27,11 @@ Final decisions still prioritize how the theme feels in actual reading, projecti
 
 ## Try It
 
-Open `out/swatches.html`, `out/roles.html`, and `out/paper.html` in a browser to inspect the palette,
-usage mockups, and long-form reading profile.
+Open `out/overview.html` in a browser for a tour of the palette
+(base / accents / extended palette / mappings) with side-by-side Light / Dark / Paper
+comparisons of the code editor, Markdown, plot, and gallery mockups.
+`out/swatches.html`, `out/roles.html`, and `out/paper.html` are the more detailed
+review pages for the palette, role mockups, and long-form reading profile.
 
 Install the VS Code / Cursor themes with:
 
