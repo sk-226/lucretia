@@ -1,13 +1,19 @@
-"""配布物の生成 (plan.md Phase 4 試作 / Phase 5, §6.3)
+"""Generate distribution artifacts from palette.json.
 
-palette.json (単一ソース) から生成:
-- dist/vscode/                    : VS Code テーマ拡張 (light / dark + ターミナル ANSI 16)
-- dist/obsidian/lucretia.css      : Obsidian CSS スニペット (リンク・ハイライター等)
+Generated outputs:
+- dist/vscode/                    : VS Code theme extension
+- dist/obsidian/lucretia-paper.css: Obsidian Minimal overlay for long-form reading
+- dist/*/THIRD_PARTY_NOTICES.md   : attribution copied beside distributable files
 
-実行: python3 scripts/build_dist.py  (先に scripts/build.py で palette.json を更新すること)
+Run scripts/build.py first so palette.json remains the source of truth.
 """
 import json
 import os
+import shutil
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from color import hex_to_rgb
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIST = os.path.join(ROOT, 'dist')
@@ -23,20 +29,17 @@ BG, BG2 = pal['bg']['bg'], pal['bg']['bg2']
 PBASE = {s: v['hex'] for s, v in pal['paper']['base'].items()}
 PBG, PBG2 = pal['paper']['bg'], pal['paper']['bg2']
 
-# VS Code 互換エディタは拡張 ID だけでなく version もローカルキャッシュや
-# .obsolete 判定に使う。開発中に同じ version の VSIX / symlink / 手動削除を
-# 行き来すると、Cursor 側で「現在の拡張」が古い削除済みエントリと衝突し、
-# 拡張一覧から消えることがある。更新作業では version を進め、両エディタへ
-# 同じ VSIX を入れることで、キャッシュを自然に新しい拡張として扱わせる。
-# ここを package.json 側の単一ソースにして、生成物の手修正を避ける。
-VSCODE_EXTENSION_VERSION = '0.2.2'
+THIRD_PARTY_NOTICE_FILE = 'THIRD_PARTY_NOTICES.md'
+
+# Bump whenever the VSIX contents change; editors cache extensions by ID/version.
+VSCODE_EXTENSION_VERSION = '0.2.3'
 
 # ============================================================
-# VS Code テーマ (plan.md §6.3: sparse highlighting)
+# VS Code theme (plan.md §6.3 sparse highlighting)
 # ============================================================
 
 def token_colors(syn, tx2):
-    """Tier 設計 (plan.md §6.3)。変数はルールなし = エディタ前景色のまま (Tier 1)"""
+    """Apply the syntax tiers while leaving variables on the editor foreground."""
     return [
         dict(name='Comment (Tier 4)', scope=['comment', 'punctuation.definition.comment'],
              settings=dict(foreground=syn['comment'], fontStyle='italic')),
@@ -55,21 +58,21 @@ def token_colors(syn, tx2):
         dict(name='Number / constant (Tier 3)',
              scope=['constant.numeric', 'constant.language', 'constant.character'],
              settings=dict(foreground=syn['number'])),
-        # --- markup (Markdown / LaTeX 等)。装飾は色でなく書体で表現する ---
+        # Markup uses typography instead of hue so prose documents stay calmer.
         dict(name='Markup heading / LaTeX section',
              scope=['markup.heading', 'entity.name.section'],
              settings=dict(fontStyle='bold')),
-        dict(name='Markup bold (\\textbf 等)',
+        dict(name='Markup bold (\\textbf, strong)',
              scope=['markup.bold', 'strong'],
              settings=dict(fontStyle='bold')),
-        dict(name='Markup italic (\\textit, \\emph 等)',
+        dict(name='Markup italic (\\textit, \\emph, emphasis)',
              scope=['markup.italic', 'emphasis'],
              settings=dict(fontStyle='italic')),
-        dict(name='Markup bold+italic (入れ子)',
+        dict(name='Markup bold+italic (nested)',
              scope=['markup.bold markup.italic',
                     'markup.italic markup.bold'],
              settings=dict(fontStyle='bold italic')),
-        dict(name='Markup underline (\\underline 等)',
+        dict(name='Markup underline (\\underline)',
              scope=['markup.underline'],
              settings=dict(fontStyle='underline')),
         dict(name='Markup strikethrough',
@@ -78,16 +81,18 @@ def token_colors(syn, tx2):
         dict(name='Markup quote',
              scope=['markup.quote'],
              settings=dict(foreground=tx2, fontStyle='italic')),
-        dict(name='Reference / citation key (\\ref, \\cite 等, Tier 3)',
+        dict(name='Reference / citation key (\\ref, \\cite, Tier 3)',
              scope=['constant.other.reference'],
              settings=dict(foreground=syn['definition'])),
     ]
 
 
 def semantic_tokens(syn, tx):
-    """semanticTokenColors: Tier 設計 (plan.md §6.3) を LSP semantic token にも適用。
-    variable 系を tx に明示固定し (Tier 1)、着色は定義箇所と既存 hue に限定する。
-    これがないと言語サーバー既定のマッピングで TextMate ルール外の色が混入しうる"""
+    """Mirror the syntax tiers for LSP semantic tokens.
+
+    Variables are pinned to tx so language-server defaults cannot introduce
+    extra hues outside the sparse-highlighting model.
+    """
     d = syn['definition']
     return {
         'variable': tx, 'parameter': tx, 'property': tx,          # Tier 1
@@ -103,10 +108,10 @@ def semantic_tokens(syn, tx):
 
 
 def ansi(theme):
-    """ターミナル ANSI 16 色 (plan.md §6.3: 色名は ANSI と自然に整合)"""
+    """Map ANSI names to palette hues while keeping normal/bright bands distinct."""
     if theme in ('light', 'paper'):
         n, b = '600', '400'   # normal / bright
-        # paper は無彩色スロットのみ暖色 pbase に置換 (有彩 6 色は共通)
+        # Paper only swaps neutral slots to pbase; chromatic ANSI hues stay shared.
         blk, wht, bblk = ((PBASE['950'], PBASE['150'], PBASE['600'])
                           if theme == 'paper' else (BLACK, BASE['150'], BASE['600']))
         return dict(black=blk, white=wht,
@@ -124,18 +129,22 @@ def ansi(theme):
                    for c in ('red', 'green', 'yellow', 'blue', 'magenta', 'cyan')})
 
 
+def selection_color(light):
+    return AC['blue']['150'] if light else AC['blue']['850']
+
+
 def vscode_theme(kind):
     light = kind in ('light', 'paper')
     if kind == 'light':
         ui, syn, (bg, bg2) = R['light'] | R['light_high'], R['syntax_light'], (BG, BG2)
     elif kind == 'paper':
-        # lucretia paper (plan.md §6.5): white は使わない (ハレーション回避)
+        # Paper avoids white UI surfaces because they glare against the warm page.
         ui, syn, (bg, bg2) = R['paper'], R['syntax_paper'], (PBG, PBG2)
     else:
         ui, syn = R['dark'], R['syntax_dark']
         bg, bg2 = ui['bg'], ui['bg-2']
     tx, tx2, tx3 = ui['tx'], ui['tx-2'], ui['tx-3']
-    sel = AC['blue']['150'] if light else AC['blue']['850']
+    sel = selection_color(light)
     inp = PBASE['50'] if kind == 'paper' else WHITE if light else BASE['900']
     err = AC['red']['600' if light else '300']
     warn = AC['orange']['600' if light else '300']
@@ -143,7 +152,7 @@ def vscode_theme(kind):
     a = ansi(kind)
 
     def ac(name, ls, ds):
-        """アクセント色をテーマ別シェードで引く (light系 / dark)"""
+        """Choose the light/paper or dark shade for one accent role."""
         return AC[name][ls if light else ds]
     colors = {
         'editor.background': bg,
@@ -192,13 +201,10 @@ def vscode_theme(kind):
         'editorError.foreground': err,
         'editorInfo.foreground': info,
 
-        # --- bracket pair colorization ---
-        # 括弧のみ 6 色フルサイクル (細いグリフで面積が小さく hue 数制限の例外)。
-        # 同一シェード帯だと細グリフでは hue 差だけで識別できないため、
-        # 全ペア間 OKLab 距離の最小値を最大化するようシェード (=明度) も振って選定。
-        # CVD (D/P 型) シミュレーション距離とAPCA |Lc|>=45 (light) / 50 (dark) を制約に
-        # 全探索した結果 (通常視 0.104→0.176, D 型隣接 0.049→0.173)。
-        # 循環順も隣接間距離が最大になる並び: blue→orange→purple→yellow→magenta→cyan
+        # Bracket pairs are the one place that uses a full six-hue cycle: the
+        # glyphs are too thin for hue alone, so shades were searched as well.
+        # The order maximizes adjacent distance under normal and D/P simulation
+        # while keeping APCA above the bracket-specific thresholds.
         'editorBracketHighlight.foreground1': ac('blue', '700', '300'),
         'editorBracketHighlight.foreground2': ac('orange', '400', '200'),
         'editorBracketHighlight.foreground3': ac('purple', '400', '200'),
@@ -210,7 +216,6 @@ def vscode_theme(kind):
         'editorBracketMatch.background': ui['ui'],
         'editorBracketMatch.border': tx3,
 
-        # --- 検索・選択・単語ハイライト ---
         'editor.findMatchBackground':
             HL['yellow'] if light else AC['yellow']['850'],
         'editor.findMatchBorder': ac('yellow', '600', '400'),
@@ -223,7 +228,6 @@ def vscode_theme(kind):
         'editor.inactiveSelectionBackground': sel + '80',
         'terminal.selectionBackground': sel,
 
-        # --- git diff / 変更表示 ---
         'editorGutter.addedBackground': ac('green', '500', '400'),
         'editorGutter.modifiedBackground': ac('blue', '500', '400'),
         'editorGutter.deletedBackground': ac('red', '500', '400'),
@@ -239,13 +243,11 @@ def vscode_theme(kind):
             ac('orange', '600', '300'),
         'gitDecoration.ignoredResourceForeground': tx3,
 
-        # --- タブ・エディタグループ ---
         'tab.activeBorderTop': ui['focus-ring'],
         'tab.hoverBackground': bg,
         'tab.border': ui['ui'],
         'editorGroupHeader.tabsBackground': bg2,
 
-        # --- サイドバー / リスト ---
         'list.inactiveSelectionBackground': ui['ui'],
         'list.focusBackground': sel,
         'list.focusForeground': tx,
@@ -253,7 +255,6 @@ def vscode_theme(kind):
         'sideBarSectionHeader.foreground': tx2,
         'tree.indentGuidesStroke': ui['ui-2'],
 
-        # --- Command Palette / Quick Pick ---
         'quickInput.background': bg2,
         'quickInput.foreground': tx,
         'quickInputList.focusBackground': sel,
@@ -261,7 +262,6 @@ def vscode_theme(kind):
         'pickerGroup.foreground': ui['link'],
         'pickerGroup.border': ui['ui'],
 
-        # --- エディタ内ウィジェット / スクロールバー ---
         'editorWidget.background': bg2,
         'editorWidget.border': ui['ui-3'],
         'editorSuggestWidget.selectedBackground': sel,
@@ -271,7 +271,7 @@ def vscode_theme(kind):
         'scrollbarSlider.hoverBackground': tx3 + '55',
         'scrollbarSlider.activeBackground': tx3 + '77',
 
-        # --- 診断 (波線は foreground のみ。border は二重マークになるため設けない) ---
+        # Diagnostics use foreground only; borders add a duplicate visual signal.
         'editorOverviewRuler.errorForeground': err,
         'editorOverviewRuler.warningForeground': warn,
         'editorOverviewRuler.infoForeground': info,
@@ -292,11 +292,9 @@ VSCODE_PKG = dict(
     description='Flexoki-inspired quiet color theme (sparse highlighting)',
     version=VSCODE_EXTENSION_VERSION, publisher='sugu', engines={'vscode': '^1.75.0'},
     categories=['Themes'],
-    # VSIX は dist/vscode を作業ディレクトリにして作るため、将来ここに確認用
-    # ファイルや一時成果物が増えても配布物へ混ざらないよう明示的に絞る。
-    # .vscodeignore ではなく package.json の files に置くのは、配布対象を
-    # 生成元の単一ソースから読める状態にしておくため。
-    files=['themes/*.json'],
+    # The VSIX is built from dist/vscode, so package files are whitelisted here
+    # to keep future scratch files out of releases without a separate .vscodeignore.
+    files=['themes/*.json', THIRD_PARTY_NOTICE_FILE],
     contributes=dict(themes=[
         dict(label='Lucretia Light', uiTheme='vs',
              path='./themes/lucretia-light-color-theme.json'),
@@ -308,60 +306,160 @@ VSCODE_PKG = dict(
 
 
 # ============================================================
-# Obsidian CSS スニペット (plan.md §6.2)
+# Obsidian CSS snippets (plan.md §6.2)
 # ============================================================
 
-def obsidian_css():
-    md, hi = R['markdown'], R['light_high']
-    ln = [
-        '/* lucretia — Obsidian CSS snippet. scripts/build_dist.py が生成 (手編集しない)',
-        '   .obsidian/snippets/ に置いて設定 > Appearance > CSS snippets で有効化 */',
-        '.theme-light {',
-        f'  --background-primary: {BG};',
-        f'  --background-secondary: {BG2};',
-        f'  --text-normal: {hi["tx"]};',
-        f'  --text-muted: {hi["tx-2"]};',
-        f'  --text-faint: {hi["tx-3"]};',
-        f'  --link-color: {md["link"]};',
-        f'  --link-external-color: {md["link"]};',
-        f'  --code-background: {md["code-inline-bg"]};',
-        f'  --blockquote-border-color: {md["quote-border"]};',
-        f'  --hr-color: {md["hr"]};',
-        f'  --text-highlight-bg: {HL["yellow"]};  /* 既定マーカー = hl-yellow */',
-        '}',
-        '/* ハイライター 8 色 (黒文字専用の規約, plan.md §9-13)。',
-        '   <mark class="hl-blue"> などで使う */',
-    ]
-    for n, v in HL.items():
-        ln.append(f'.theme-light mark.hl-{n}, .theme-light .hl-{n} {{ background: {v}; }}')
-    return '\n'.join(ln) + '\n'
+def css_rgb(hex_color):
+    return ', '.join(str(v) for v in hex_to_rgb(hex_color))
+
+
+def css_rgba(hex_color, alpha):
+    return f'rgba({css_rgb(hex_color)}, {alpha})'
 
 
 def obsidian_paper_css():
-    """lucretia paper (plan.md §6.5): 長文読書用。lucretia.css と同時に有効化しない"""
-    md, pa = R['markdown_paper'], R['paper']
+    md, pa, syn = R['markdown_paper'], R['paper'], R['syntax_paper']
+    heading_color_vars = [
+        f'  --{name}-color: {md["heading"]};'
+        for name in ('h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'inline-title')
+    ]
+    color_vars = [
+        line
+        for css_name, accent_name in (
+            ('red', 'red'),
+            ('orange', 'orange'),
+            ('yellow', 'yellow'),
+            ('green', 'green'),
+            ('cyan', 'cyan'),
+            ('blue', 'blue'),
+            ('purple', 'purple'),
+            ('pink', 'magenta'),
+        )
+        for line in (
+            f'  --color-{css_name}: {AC[accent_name]["600"]};',
+            f'  --color-{css_name}-rgb: {css_rgb(AC[accent_name]["600"])};',
+        )
+    ]
     ln = [
-        '/* lucretia paper — Obsidian CSS snippet. scripts/build_dist.py が生成 (手編集しない)',
-        '   長文読書用の温かみプロファイル。lucretia.css とはどちらか一方だけ有効化する */',
-        '.theme-light {',
-        f'  --background-primary: {PBG};',
-        f'  --background-secondary: {PBG2};',
-        f'  --text-normal: {pa["tx"]};',
-        f'  --text-muted: {pa["tx-2"]};',
-        f'  --text-faint: {pa["tx-3"]};',
-        f'  --link-color: {md["link"]};',
-        f'  --link-external-color: {md["link"]};',
-        f'  --code-background: {md["code-inline-bg"]};',
+        '/* lucretia paper - generated; do not edit by hand. See THIRD_PARTY_NOTICES.md. */',
+        '',
+        '/* Match Minimal preset specificity without !important. */',
+        'body.theme-light.theme-light {',
+        '  color-scheme: light;',
+        f'  --bg1: {pa["bg"]};',
+        f'  --bg2: {pa["bg-2"]};',
+        f'  --bg3: {css_rgba(pa["tx"], "0.055")};',
+        f'  --ui1: {pa["ui"]};',
+        f'  --ui2: {pa["ui-2"]};',
+        f'  --ui3: {pa["ui-3"]};',
+        f'  --tx1: {pa["tx"]};',
+        f'  --tx2: {pa["tx-2"]};',
+        f'  --tx3: {pa["tx-3"]};',
+        f'  --tx4: {PBASE["600"]};',
+        f'  --ax1: {pa["link"]};',
+        f'  --ax2: {pa["link-hover"]};',
+        f'  --ax3: {pa["link"]};',
+        f'  --hl1: {css_rgba(selection_color(True), "0.55")};',
+        f'  --hl2: {HL["yellow"]};',
+        f'  --sp1: {WHITE};',
+        f'  --mono100: {pa["tx"]};',
+        f'  --mono0: {PBG};',
+        f'  --background-primary: var(--bg1);',
+        f'  --background-primary-alt: var(--bg2);',
+        f'  --background-secondary: var(--bg2);',
+        f'  --background-secondary-alt: var(--bg1);',
+        f'  --background-table-rows: var(--bg2);',
+        f'  --background-modifier-hover: var(--bg3);',
+        f'  --background-modifier-active-hover: var(--bg3);',
+        f'  --background-modifier-border: var(--ui1);',
+        f'  --background-modifier-border-hover: var(--ui2);',
+        f'  --background-modifier-border-focus: var(--ui3);',
+        f'  --background-modifier-cover: {css_rgba(PBASE["900"], "0.18")};',
+        f'  --background-modifier-form-field: {PBASE["50"]};',
+        f'  --background-modifier-form-field-highlighted: {PBASE["50"]};',
+        f'  --divider-color: var(--ui1);',
+        f'  --frame-divider-color: var(--ui1);',
+        f'  --ribbon-background: var(--bg2);',
+        f'  --titlebar-background: var(--bg2);',
+        f'  --titlebar-background-focused: var(--bg2);',
+        f'  --titlebar-text-color-focused: var(--tx1);',
+        f'  --mobile-sidebar-background: var(--bg1);',
+        f'  --workspace-background-translucent: {css_rgba(PBG, "0.78")};',
+        f'  --modal-background: var(--bg1);',
+        f'  --modal-border-color: var(--ui2);',
+        f'  --prompt-border-color: var(--ui3);',
+        f'  --text-normal: var(--tx1);',
+        f'  --text-muted: var(--tx2);',
+        f'  --text-faint: var(--tx3);',
+        f'  --text-formatting: var(--tx3);',
+        f'  --text-accent: var(--ax1);',
+        f'  --text-accent-hover: var(--ax2);',
+        f'  --text-selection: var(--hl1);',
+        f'  --text-highlight-bg: var(--hl2);',
+        f'  --text-highlight-bg-active: {AC["yellow"]["100"]};',
+        f'  --text-bold: var(--tx1);',
+        f'  --text-italic: var(--tx1);',
+        f'  --text-code: var(--tx4);',
+        f'  --text-blockquote: var(--tx2);',
+        f'  --link-color: var(--ax1);',
+        f'  --link-color-hover: var(--ax2);',
+        f'  --link-external-color: var(--ax1);',
+        f'  --link-external-color-hover: var(--ax2);',
+        f'  --interactive-accent: var(--ax3);',
+        f'  --interactive-accent-hover: var(--ax2);',
+        f'  --interactive-accent-rgb: {css_rgb(pa["link"])};',
+        f'  --interactive-normal: {PBASE["50"]};',
+        f'  --interactive-hover: var(--ui1);',
+        f'  --checkbox-color: var(--ax3);',
+        f'  --focus-ring-color: {pa["focus-ring"]};',
+        f'  --nav-item-color: var(--tx2);',
+        f'  --nav-item-color-hover: var(--tx1);',
+        f'  --nav-item-color-active: var(--tx1);',
+        f'  --nav-item-background-hover: var(--bg3);',
+        f'  --nav-item-background-active: var(--bg3);',
+        f'  --nav-indentation-guide-color: var(--ui1);',
+        f'  --icon-color: var(--tx2);',
+        f'  --icon-color-hover: var(--tx1);',
+        f'  --icon-color-active: var(--tx1);',
+        f'  --scrollbar-thumb-bg: var(--ui1);',
+        f'  --scrollbar-active-thumb-bg: var(--ui3);',
+        f'  --active-line-bg: {css_rgba(PBASE["900"], "0.035")};',
+        f'  --quote-opening-modifier: {md["quote-border"]};',
+        f'  --blockquote-color: {md["quote-text"]};',
         f'  --blockquote-border-color: {md["quote-border"]};',
         f'  --hr-color: {md["hr"]};',
-        f'  --text-highlight-bg: {HL["yellow"]};  /* 既定マーカー = hl-yellow */',
+        f'  --code-background: {md["code-inline-bg"]};',
+        f'  --code-normal: {syn["variable"]};',
+        f'  --code-comment: {syn["comment"]};',
+        f'  --code-function: {syn["definition"]};',
+        f'  --code-keyword: {syn["keyword"]};',
+        f'  --code-important: {AC["red"]["600"]};',
+        f'  --code-operator: {syn["operator"]};',
+        f'  --code-property: {syn["definition"]};',
+        f'  --code-punctuation: {syn["operator"]};',
+        f'  --code-string: {syn["string"]};',
+        f'  --code-tag: {syn["keyword"]};',
+        f'  --code-value: {syn["number"]};',
+        *heading_color_vars,
+        f'  --tag-color: var(--tx2);',
+        f'  --tag-background: {PBASE["100"]};',
+        f'  --tag-background-hover: {PBASE["150"]};',
+        f'  --tag-border-color: {PBASE["150"]};',
+        f'  --table-border-color: var(--ui1);',
+        f'  --table-header-background: var(--bg2);',
+        f'  --table-row-background-hover: var(--bg3);',
+        *color_vars,
         '}',
-        '/* 見出しは本文より一段沈めた無彩色で階層を出す (markdown_paper.heading) */',
-        '.theme-light .markdown-preview-view :is(h1,h2,h3,h4,h5,h6),',
-        '.theme-light .cm-header {',
+        'body.is-mobile.theme-light.theme-light {',
+        f'  --mobile-sidebar-background: var(--bg1);',
+        f'  --workspace-background-translucent: {css_rgba(PBG, "0.84")};',
+        f'  --background-modifier-cover: {css_rgba(PBASE["900"], "0.22")};',
+        '}',
+        'body.theme-light .markdown-preview-view :is(h1,h2,h3,h4,h5,h6),',
+        'body.theme-light .cm-header,',
+        'body.theme-light .inline-title {',
         f'  color: {md["heading"]};',
         '}',
-        '/* ハイライター 8 色 (黒文字専用の規約, plan.md §9-13) */',
     ]
     for n, v in HL.items():
         ln.append(f'.theme-light mark.hl-{n}, .theme-light .hl-{n} {{ background: {v}; }}')
@@ -371,18 +469,19 @@ def obsidian_paper_css():
 # ============================================================
 if __name__ == '__main__':
     vs = os.path.join(DIST, 'vscode')
+    ob = os.path.join(DIST, 'obsidian')
     os.makedirs(os.path.join(vs, 'themes'), exist_ok=True)
+    os.makedirs(ob, exist_ok=True)
     with open(os.path.join(vs, 'package.json'), 'w') as f:
         json.dump(VSCODE_PKG, f, indent=2)
+    notice_source = os.path.join(ROOT, THIRD_PARTY_NOTICE_FILE)
+    for notice_dir in (vs, ob):
+        shutil.copyfile(notice_source, os.path.join(notice_dir, THIRD_PARTY_NOTICE_FILE))
     for kind in ('light', 'dark', 'paper'):
         p = os.path.join(vs, 'themes', f'lucretia-{kind}-color-theme.json')
         with open(p, 'w') as f:
             json.dump(vscode_theme(kind), f, ensure_ascii=False, indent=2)
-    ob = os.path.join(DIST, 'obsidian')
-    os.makedirs(ob, exist_ok=True)
-    with open(os.path.join(ob, 'lucretia.css'), 'w') as f:
-        f.write(obsidian_css())
     with open(os.path.join(ob, 'lucretia-paper.css'), 'w') as f:
         f.write(obsidian_paper_css())
-    print('generated: dist/vscode/{package.json,themes/*.json}, '
-          'dist/obsidian/{lucretia,lucretia-paper}.css')
+    print('generated: dist/vscode/{package.json,themes/*.json,THIRD_PARTY_NOTICES.md}, '
+          'dist/obsidian/{lucretia-paper.css,THIRD_PARTY_NOTICES.md}')

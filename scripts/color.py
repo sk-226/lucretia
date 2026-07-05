@@ -1,13 +1,14 @@
-"""色変換・評価指標ライブラリ (plan.md §5, Phase 0)
+"""Color conversion and evaluation helpers for plan.md §5.
 
-依存なし (標準ライブラリのみ)。実装:
-- sRGB <-> Oklab / OKLCH (Björn Ottosson の公式係数)
-- ΔEok (Oklab ユークリッド距離)
-- WCAG 2.x コントラスト比
-- APCA-W3 0.0.98G-4g 相当の Lc 値
-- sRGB ガモット判定と chroma クランプ
+This module intentionally has no third-party dependencies so palette generation
+stays easy to run in a fresh checkout. Implemented metrics:
+- sRGB <-> Oklab / OKLCH using Björn Ottosson's published coefficients
+- ΔEok (Euclidean distance in Oklab)
+- WCAG 2.x contrast ratio
+- APCA-W3 0.0.98G-4g-style Lc value
+- sRGB gamut checks and chroma clamping
 
-`python3 color.py` で自己テスト実行。
+Run `python3 color.py` for the local self-test.
 """
 import math
 
@@ -47,7 +48,7 @@ def rgb_to_oklab(r, g, b):
 
 
 def oklab_to_linear_rgb(L, a, b):
-    """クランプなしの線形RGB (ガモット判定に使う)"""
+    """Return unclamped linear RGB so gamut checks can see overshoot."""
     l_ = L + 0.3963377774 * a + 0.2158037573 * b
     m_ = L - 0.1055613458 * a - 0.0638541728 * b
     s_ = L - 0.0894841775 * a - 1.2914855480 * b
@@ -78,7 +79,7 @@ def oklch_to_hex(L, C, H):
 
 
 def clamp_chroma(L, C, H):
-    """C を sRGB ガモット内に収まる最大値 (<= C) まで二分探索で下げる"""
+    """Lower C by binary search until the OKLCH color fits in sRGB."""
     if oklch_in_gamut(L, C, H):
         return C
     lo, hi = 0.0, C
@@ -129,7 +130,7 @@ def _soft_clamp(y):
 
 
 def apca_lc(txt, bg):
-    """APCA Lc 値。txt が bg より暗ければ正 (BoW)、明るければ負 (WoB)。"""
+    """Return APCA Lc; positive means dark text on a lighter background."""
     ytx, ybg = _soft_clamp(_apca_y(txt)), _soft_clamp(_apca_y(bg))
     if abs(ybg - ytx) < _SA['deltaYmin']:
         return 0.0
@@ -142,8 +143,9 @@ def apca_lc(txt, bg):
     return out * 100
 
 
-# ---------- CVD シミュレーション (Machado et al. 2009, severity 1.0) ----------
-# 線形 RGB に適用する 3x3 行列。colorspacious / DaltonLens が採用する標準値
+# ---------- CVD simulation (Machado et al. 2009, severity 1.0) ----------
+# These 3x3 matrices are applied in linear RGB and match common tooling such as
+# colorspacious and DaltonLens.
 _CVD_MATRICES = {
     'protan': ((0.152286, 1.052583, -0.204868),
                (0.114503, 0.786281, 0.099216),
@@ -158,7 +160,7 @@ _CVD_MATRICES = {
 
 
 def cvd_hex(h, kind):
-    """hex 色を P型/D型/T型 (2色覚, severity 1.0) の見えにシミュレートした hex を返す"""
+    """Simulate a hex color under protan/deutan/tritan vision."""
     m = _CVD_MATRICES[kind]
     lin = [srgb_to_linear(c) for c in hex_to_rgb(h)]
     out = []
@@ -168,23 +170,23 @@ def cvd_hex(h, kind):
     return rgb_to_hex(*out)
 
 
-# ---------- 自己テスト ----------
+# ---------- Self-test ----------
 if __name__ == '__main__':
     ok = True
 
-    # OKLCH 往復
+    # OKLCH roundtrip.
     for h in ('#FFFCF0', '#205EA6', '#100F0F', '#AD8301'):
         h2 = oklch_to_hex(*hex_to_oklch(h))
         d = deltaE_ok(h, h2)
         if d > 1e-3:
             print(f'[FAIL] roundtrip {h} -> {h2} (dE={d:.5f})'); ok = False
 
-    # WCAG 既知値: #767676 on #FFFFFF ≈ 4.54:1
+    # Known WCAG value: #767676 on #FFFFFF is about 4.54:1.
     w = wcag('#767676', '#FFFFFF')
     if abs(w - 4.54) > 0.01:
         print(f'[FAIL] WCAG #767676/#fff = {w:.3f} (expected 4.54)'); ok = False
 
-    # APCA 公式リファレンス値 (apca-w3 README, 0.0.98G-4g)
+    # APCA reference values from the apca-w3 README, 0.0.98G-4g.
     refs = [('#888888', '#FFFFFF', 63.056469930209424),
             ('#FFFFFF', '#888888', -68.54146436644962),
             ('#000000', '#AAAAAA', 58.146262578561334),
@@ -196,11 +198,11 @@ if __name__ == '__main__':
         else:
             print(f'[ok] APCA {txt} on {bg}: {got:.4f} (ref {exp:.4f})')
 
-    # ガモットクランプ: 派手な色は必ず in-gamut に落ちる
+    # Chroma clamping must pull saturated colors back into gamut.
     c = clamp_chroma(0.53, 0.4, 145)
     assert oklch_in_gamut(0.53, c, 145)
 
-    # CVD: 無彩色はほぼ不変 (行の和 ≈ 1)、P/D 型では赤と緑の距離が大きく縮む
+    # CVD simulation should preserve neutrals and reduce red/green distance.
     for kind in ('protan', 'deutan', 'tritan'):
         d = deltaE_ok('#808080', cvd_hex('#808080', kind))
         if d > 0.02:
@@ -208,7 +210,7 @@ if __name__ == '__main__':
     d_orig = deltaE_ok('#AF3028', '#66800B')  # Flexoki red-600 vs green-600
     for kind in ('protan', 'deutan'):
         d_sim = deltaE_ok(cvd_hex('#AF3028', kind), cvd_hex('#66800B', kind))
-        # protan は L 差が残るため縮小は緩やか、deutan は大きく潰れる
+        # Protan keeps more lightness separation; deutan compresses more strongly.
         if d_sim > 0.75 * d_orig:
             print(f'[FAIL] CVD {kind}: red/green distance not reduced '
                   f'({d_sim:.3f} vs {d_orig:.3f})'); ok = False

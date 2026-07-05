@@ -1,16 +1,16 @@
-% Lucretia theme check — check.tex (シンタックスには LaTeX Workshop 拡張が必要)
+% Lucretia theme check — check.tex (requires the LaTeX Workshop extension)
 %
-% チェック項目:
-%   ① このコメントが斜体グレーで沈んでいる (Tier 4)
-%   ② Cmd+F で「確認」を検索 → 現在の一致 = hl-yellow + 枠線、他の一致 = 半透明
-%   ③ 括弧にカーソルを置く → 対応括弧に枠 (bracketMatch)
-%   ④ \textbf 等の中身が実際に太字/斜体/下線で描画される
+% Checks:
+%   1. Comments render as quiet italic gray (Tier 4).
+%   2. Cmd+F on "quote" shows the current match with hl-yellow and a border.
+%   3. Placing the cursor on a bracket shows bracketMatch.
+%   4. \textbf, \textit, \emph, and \underline render with real font styling.
 \documentclass{article}
 \begin{document}
 
 \section{見出しは太字になる}
 
-{{{{{{}}}}}} // 連続括弧 6 段: blue→orange→magenta→cyan→purple→green で開き、逆順で閉じる
+{{{{{{}}}}}} // Six bracket levels open blue -> orange -> purple -> yellow -> magenta -> cyan.
 
 本文は tx のまま彩色されない。\textbf{太字}、\textit{斜体}、\emph{強調}、
 \underline{下線}、\textbf{\textit{太字イタリック}} の入れ子を確認。

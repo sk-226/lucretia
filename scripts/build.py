@@ -1,15 +1,16 @@
-"""パレット生成 + 検証用 HTML 出力
+"""Generate the palette and the HTML review pages.
 
-出力:
-- palette.json      : 全色 (OKLCH パラメータ + hex) + ロールマッピング。単一ソース
-- out/swatches.html : 確定 bg プレビュー / スケール一覧 / コード階層デモ
-- out/contrast.html : コントラスト行列 (WCAG + APCA) + 淡色帯 50–200 の両用途検証
-- out/cvd.html      : P/D/T 型シミュレーション + ペア ΔEok 行列
-- out/roles.html    : ロール表 + 用途モック (スライド / Markdown / ギャラリー)
-- out/degrade.html  : 投影劣化シミュレーション (彩度低下 / ガンマ / 黒浮き)
-- out/tokens.css    : CSS variables (palette.json から生成)
+Outputs:
+- palette.json      : the single source of truth for colors and role mappings
+- out/swatches.html : final bg preview, scales, and syntax hierarchy checks
+- out/contrast.html : WCAG/APCA matrices and tint-step usage checks
+- out/cvd.html      : P/D/T simulations and pairwise ΔEok matrices
+- out/roles.html    : role tables plus slide, Markdown, editor, and gallery mocks
+- out/degrade.html  : simple projection/display degradation simulations
+- out/tokens.css    : CSS variables generated from palette.json
 
-パラメータは全てこのファイル冒頭の定数。ここを触って再実行すれば全成果物が更新される。
+The constants near the top are intentionally the edit surface; rerunning this
+script refreshes every generated artifact.
 """
 import json
 import os
@@ -23,23 +24,23 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, 'out')
 
 # ============================================================
-# 設計パラメータ (plan.md §4.3)。Flexoki 実測から導いた初期値
+# Design parameters from plan.md §4.3, seeded from measured Flexoki values.
 # ============================================================
 STEPS = [50, 100, 150, 200, 300, 400, 500, 600, 700, 800, 850, 900, 950]
 
-# 共通 L カーブ (step -> L)
+# Shared lightness curve (step -> L).
 L_BASE = {50: .96, 100: .92, 150: .88, 200: .84, 300: .76, 400: .66,
           500: .59, 600: .53, 700: .46, 800: .39, 850: .35, 900: .30, 950: .24}
 
-# C カーブ係数 (Cmax に掛ける)。中央で最大、端でも 0 にしない (インク感)
+# Chroma peaks in the middle but never reaches zero, preserving an ink-like tint.
 C_FACTOR = {50: .25, 100: .35, 150: .45, 200: .55, 300: .75, 400: .95,
             500: 1.0, 600: 1.0, 700: .92, 800: .80, 850: .72, 900: .62, 950: .50}
 
-# 色ごとの L 補正の効き方 (中央で 1、端で弱める)
+# Hue-specific lightness offsets are strongest near the center of each scale.
 L_DELTA_W = {50: .15, 100: .30, 150: .45, 200: .60, 300: .85, 400: 1.0,
              500: 1.0, 600: 1.0, 700: .85, 800: .65, 850: .55, 900: .45, 950: .30}
 
-# hue / 最大彩度 / L 補正 (600 での Flexoki 実測 - 共通カーブ 0.53 の差分が初期値)
+# Hue, max chroma, and the lightness delta measured at step 600.
 ACCENTS = {
     #        H,    Cmax,  Ldelta
     'red':     (28,  .165, -.026),
@@ -52,10 +53,10 @@ ACCENTS = {
     'magenta': (350, .161, -.035),
 }
 
-# base スケール (plan.md §4.2) — Phase 1 で neutral に確定 (2026-07: warm 案は廃止)
+# The neutral base won in Phase 1; the earlier warm-base option is not used.
 BASE = dict(H=97, C_light=.002, C_dark=.002)
 
-# 背景 (plan.md §4.1) — Phase 1 で案 A に確定 (B/C 案は廃止)
+# Phase 1 finalized former option A as the general-purpose background.
 BG = (0.990, 0.006, 95)
 BG2_OFFSET = (-0.025, +0.002)  # bg-2 = (L+dL, C+dC)
 
@@ -63,18 +64,18 @@ WHITE = '#FFFFFF'
 BLACK_L, BLACK_C = 0.17, 0.002
 
 # ------------------------------------------------------------
-# lucretia paper (plan.md §6.5): 長文読書用の温かみプロファイル。
-# 紙の快適さ = 低輝度・暖色スペクトルの近似として bg の L を下げ C を上げる。
-# プレゼン・ギャラリー用途は対象外 (写真中立性の制約がないので暖色 base を使う)
+# lucretia paper is scoped to long-form reading. It lowers L and raises warm C
+# to approximate paper comfort; presentation and gallery use stay on the
+# neutral profile because those contexts need less color cast around images.
 # ------------------------------------------------------------
-# 背景 — P2 (生成り) に確定 (2026-07, plan.md §9-16。P1/P3 案は廃止)
+# P2 is the final paper background; P1/P3 remain rejected alternatives.
 PAPER_BG = (0.970, 0.014, 92)
-# 暖色 base (paper 専用)。neutral base は暖色 bg 上で青白く浮くため
+# Paper gets its own warm base because the neutral base looks cool on warm bg.
 PAPER_BASE = dict(H=92, C_light=.014, C_dark=.006)
 
 
 # ============================================================
-# 生成
+# Generation
 # ============================================================
 
 def gen_accent(name):
@@ -87,9 +88,9 @@ def gen_accent(name):
     return out
 
 
-# ハイライター (Obsidian 等のマーカー線用)。tint 150 (L .88, C 0.45*Cmax) より
-# 高彩度・高明度にして「蛍光マーカー」の見えにする。黒文字 (tx / tx 太字) 専用。
-# L=0.93: 黒文字で全色 |Lc| >= 90 (本文級) を満たす下限 (0.92 以下だと red/magenta が未達)
+# Highlighters are brighter and more chromatic than tint-150 so they read as
+# marker ink, not panels. They are restricted to black text; L=0.93 is the
+# lowest tested value where every hue still reaches body-grade |Lc| >= 90.
 HL_L, HL_CFACTOR = 0.93, 0.85
 
 
@@ -105,7 +106,7 @@ def gen_base(cfg=BASE):
     out = {}
     for s in STEPS:
         L = L_BASE[s]
-        t = (L - L_BASE[950]) / (L_BASE[50] - L_BASE[950])  # 1=明, 0=暗
+        t = (L - L_BASE[950]) / (L_BASE[50] - L_BASE[950])  # 1=light, 0=dark
         C = cfg['C_dark'] + (cfg['C_light'] - cfg['C_dark']) * t
         C = clamp_chroma(L, C, cfg['H'])
         out[s] = dict(hex=oklch_to_hex(L, C, cfg['H']),
@@ -114,76 +115,74 @@ def gen_base(cfg=BASE):
 
 
 # ============================================================
-# ロールマッピング (plan.md §6, Phase 3)。値は「参照名」で書き、hex は解決して出力
-#   参照名: 'white' 'black' 'bg' 'bg2' / 'base-600' / 'blue-600' など
+# Role mappings stay as palette references so generated artifacts cannot drift
+# from palette.json. Hex values are resolved only at output time.
+# References: 'white', 'black', 'bg', 'bg2', 'base-600', 'blue-600', etc.
 # ============================================================
 ROLES = {
-    # 共通 UI (ライト)
+    # Shared light UI roles.
     'light': dict(
         bg='bg', bg_2='bg2', card='white',
         ui='base-100', ui_2='base-150', ui_3='base-200',
         link='blue-600', link_hover='blue-800', visited='purple-600',
         focus_ring='blue-400',
-        # white は「際立たせる」用途 (カード等) 専用で、地としては使わない (plan.md §9-14)
+        # White is reserved for raised surfaces; using it as a page bg was too stark.
         photo_surface='bg',
     ),
-    # テキスト 2 プロファイル (plan.md §4.2)
+    # Two text profiles let quiet surfaces opt out of maximum contrast.
     'light_high': dict(tx='black', tx_2='base-700', tx_3='base-500'),
     'light_quiet': dict(tx='base-800', tx_2='base-600', tx_3='base-400'),
-    # ダーク (コーディング / ギャラリー暗背景。plan.md §6.3, §6.4)
-    # bg は black: base-950 だと tx=base-100 が Lc -88.5 で本文目標 90 に届かない (APCA 実測)
+    # Dark coding/gallery surfaces use true black because base-950 left
+    # base-100 below the APCA body target in measurement.
     'dark': dict(
         bg='black', bg_2='base-950',
         ui='base-900', ui_2='base-850', ui_3='base-800',
         tx='base-100', tx_2='base-300', tx_3='base-500',
         link='blue-300', link_hover='blue-200', visited='purple-300',
         focus_ring='blue-300',
-        photo_surface='base-950',       # 確定 (plan.md §9-15)。黒より一段浮かせた C≈0 面
+        photo_surface='base-950',       # Final: a near-neutral surface one step above black.
     ),
-    # シンタックス (plan.md §6.3 sparse highlighting)
-    # keyword=magenta: definition=blue と purple は CVD D型で ΔEok 0.027 と近すぎる
-    # (out/cvd.html)。plan §6.3 の「キーワード=magenta or purple / 数値=purple」の範囲内
+    # Keywords use magenta because purple sat too close to definition blue under
+    # deuteranopia simulation; numbers keep purple within the original plan.
     'syntax_light': dict(
         variable='black', definition='blue-600', keyword='magenta-600',
         string='green-600', number='purple-600',
         operator='base-500', comment='base-400',
     ),
-    # ダークは 300 帯中心: 400 帯は black 上で Lc -31〜-49 と暗すぎる (APCA 実測)。
-    # string のみ 400 (green-300 は Lc -65 で Tier2 より目立ってしまうため)
+    # Dark syntax centers on step 300; step 400 was too dim on black. Strings
+    # alone stay at green-400 so they do not outrank Tier-2 definitions.
     'syntax_dark': dict(
         variable='base-100', definition='blue-300', keyword='magenta-300',
         string='green-400', number='purple-300',
         operator='base-300', comment='base-500',
     ),
-    # プレゼン (plan.md §6.1)。テキストは light_high を継承
+    # Presentation inherits high-contrast light text roles.
     'presentation': dict(
         emphasis_1='blue-600', emphasis_2='red-600',
         sub_1='green-600', sub_2='orange-600',
-        sub_3='yellow-600',             # 規約: 太字・大サイズ限定 (plan.md §4.3)
+        sub_3='yellow-600',             # Large/bold only; yellow is weak for body text.
         note_fill='red-100', note_text='red-800',
         info_fill='blue-100', info_text='blue-800',
-        # chart 1-7: MATLAB の 7 色構成に倣い、L 段差 (300-600 帯混在) で CVD 耐性を確保。
-        # 貪欲法で「先頭から k 色使ったときの P/D/T 込み最悪ペア ΔEok」を最大化した順。
-        # 全ペア最悪 0.042 (旧 400 帯 5 色構成は 0.018 だった)。それでも色だけに頼らず
-        # マーカー形状・線種を併用する (plan.md §1, §9-9)
+        # The chart order assumes multi-series plots and mixes lightness bands
+        # for CVD resilience. A greedy search maximized the worst pairwise ΔEok
+        # for each prefix, but marks/line styles are still required.
         chart_1='blue-400', chart_2='orange-600', chart_3='purple-600',
         chart_4='red-300', chart_5='yellow-500', chart_6='cyan-600',
         chart_7='green-500',
     ),
-    # Markdown エディタ (plan.md §6.2)
+    # Markdown editor roles.
     'markdown': dict(
         heading='black', body='black', link='blue-600',
         code_inline_bg='base-50', code_block_bg='bg2',
         quote_text='base-700', quote_border='base-150', hr='base-150',
     ),
-    # ギャラリー Extended (plan.md §6.4)。scrim は build 時に alpha 階段を展開
+    # Gallery scrims are expanded into alpha steps during role resolution.
     'gallery': dict(caption='base-600', meta='base-400'),
-    # ハイライター (マーカー線)。規約: base の文字 (tx / tx 太字) の下にのみ引く。
-    # 有彩色文字・リンクの上には使わない (色×色で意味が濁るため)
+    # Highlighters are only for base text or bold base text. They are not used
+    # under colored links because color-on-color muddies the semantic cue.
     'highlight': {n: f'hl-{n}' for n in ACCENTS},
-    # lucretia paper (plan.md §6.5): 長文読書プロファイル。
-    # tx = pbase-900 (P2 上 12.5:1 / Lc+94): 高コントラスト基準は満たしつつ
-    # black (17.6:1) のハレーションを避ける「書籍インク」帯。white は使わない
+    # Paper uses pbase-900 as book ink: it meets high-contrast targets without
+    # the glare of black on a warm page. White is intentionally absent.
     'paper': dict(
         bg='paper-bg', bg_2='paper-bg2',
         ui='pbase-100', ui_2='pbase-150', ui_3='pbase-200',
@@ -191,14 +190,14 @@ ROLES = {
         link='blue-600', link_hover='blue-800', visited='purple-600',
         focus_ring='blue-400',
     ),
-    # シンタックスは syntax_light と同じ hue/step 割当 (P2 上でも同水準の
-    # コントラストを確認済み)。無彩色トークンのみ暖色 pbase / インクに置換
+    # Paper syntax keeps the light hue/step assignments; only neutral tokens
+    # swap to warm pbase after contrast checks on P2.
     'syntax_paper': dict(
         variable='pbase-900', definition='blue-600', keyword='magenta-600',
         string='green-600', number='purple-600',
         operator='pbase-500', comment='pbase-400',
     ),
-    # Markdown (読書ビュー)。見出しだけ本文より一段沈めて無彩色で階層を出す
+    # Reading headings stay neutral and slightly deeper to create hierarchy.
     'markdown_paper': dict(
         heading='pbase-950', body='pbase-900', link='blue-600',
         code_inline_bg='pbase-100', code_block_bg='paper-bg2',
@@ -240,8 +239,8 @@ def build_roles(pal):
 
 def build_palette():
     pal = dict(meta=dict(source='build.py',
-                         note='Phase 1 決定済み (bg=案A, base=neutral)。'
-                              'Phase 3 ロールはドラフト (photo-surface 等は仮決め)'))
+                         note='Phase 1 finalized bg=option A and base=neutral. '
+                              'Phase 3 roles remain draft where marked provisional.'))
     pal['special'] = dict(white=WHITE,
                           black=oklch_to_hex(BLACK_L, BLACK_C, 97))
     L, C, H = BG
@@ -250,7 +249,7 @@ def build_palette():
     pal['bg'] = dict(bg=bg, bg2=bg2, oklch=[L, C, H],
                      dE_white=round(deltaE_ok(bg, WHITE), 4),
                      dE_paper=round(deltaE_ok(bg, '#FFFCF0'), 4))
-    # lucretia paper (plan.md §6.5)
+    # Paper profile.
     pL, pC, pH = PAPER_BG
     pbg = oklch_to_hex(pL, pC, pH)
     pal['paper'] = dict(
@@ -267,7 +266,7 @@ def build_palette():
 
 
 # ============================================================
-# HTML 共通
+# Shared HTML helpers.
 # ============================================================
 CSS = """
 body{font-family:-apple-system,'Helvetica Neue',sans-serif;margin:0;padding:24px;
@@ -287,6 +286,20 @@ pre{border-radius:8px;padding:14px;font-size:12.5px;line-height:1.6;
 .p2{background:#E8F5E9}.p1{background:#FFFDE7}.p0{background:#FFF3E0}.pf{background:#FFEBEE}
 """
 
+# Public preview pages are committed under out/, so their sample copy should not
+# encode the author's research topics, local workflow, or personal captions. The
+# examples below intentionally use generic product/content language: it still
+# exercises headings, links, code, warnings, highlights, and long-form reading,
+# but it does not leak personal context. We avoid Lorem Ipsum because real words
+# are better for judging rhythm, contrast, and link/highlight weight.
+READING_SAMPLE = (
+    'Long-form reading depends on a careful balance between page brightness '
+    'and ink density. Stable spacing, line height, and quieter secondary text '
+    'make it easier to return to the body copy. The reading profile therefore '
+    'avoids overly white surfaces while letting links and inline code rise '
+    'only as much as they need to.'
+)
+
 
 def text_color_for(hexbg):
     return '#111' if hex_to_oklch(hexbg)[0] > 0.62 else '#FFF'
@@ -303,18 +316,19 @@ def chip(hexv, label):
 
 def html_swatches(pal):
     h = [f'<!doctype html><meta charset="utf-8"><title>swatches</title><style>{CSS}</style>']
-    h.append('<h1>カラーテーマ スウォッチ（初期生成）</h1>'
-             '<p class="small">plan.md §4 の初期パラメータによる自動生成。'
-             'Phase 1–2 でこのページを見ながら build.py の定数を調整する。</p>')
+    h.append('<h1>Color Theme Swatches (Generated Draft)</h1>'
+             '<p class="small">Generated from the initial parameters in plan.md §4. '
+             'Use this page during Phase 1-2 to tune the constants in build.py.</p>')
 
-    # --- bg (Phase 1 で案 A に確定) ---
-    h.append('<h2>1. 背景（Phase 1 確定: 旧案 A）— white カード・本文・アクセント・淡色塗り</h2>')
+    # Phase 1 finalized this single background, so the preview compares usage.
+    h.append('<h2>1. Background (Phase 1 final: former option A) - '
+             'white cards, body text, accents, and tint fills</h2>')
     blk = pal['special']['black']
     b6, r6 = pal['accents']['blue'][600]['hex'], pal['accents']['red'][600]['hex']
     g6 = pal['accents']['green'][600]['hex']
     tx2 = pal['base'][600]['hex']
 
-    # 淡色塗りボックス (plan.md §6.1: 塗り 50/100 + 同系統 800 の文字)
+    # Tint fills use same-hue dark text to verify practical alert/info boxes.
     TINT_HUES = ('blue', 'red', 'yellow', 'orange', 'green')
 
     def tint_rows():
@@ -336,71 +350,72 @@ def html_swatches(pal):
             f'<div class="card" style="background:{d["bg"]}">'
             f'<b style="color:{blk}">{k}</b> <span class="small">{d["bg"]} '
             f'(ΔE white {d["dE_white"]}, paper {d["dE_paper"]})</span>'
-            f'<div class="wbox"><span style="color:{blk}">white カード上の本文。</span> '
-            f'<span style="color:{b6}">強調</span> / <span style="color:{r6}">警告</span></div>'
-            f'<p style="color:{blk};margin:6px 0">bg 直上の本文テキスト。'
-            f'<span style="color:{tx2}">サブテキスト（灰）。</span> '
-            f'<b style="color:{g6}">サブカラー緑。</b></p>'
+            f'<div class="wbox"><span style="color:{blk}">Body text on a white card.</span> '
+            f'<span style="color:{b6}">emphasis</span> / <span style="color:{r6}">warning</span></div>'
+            f'<p style="color:{blk};margin:6px 0">Body text directly on bg. '
+            f'<span style="color:{tx2}">Secondary text (gray).</span> '
+            f'<b style="color:{g6}">Green secondary color.</b></p>'
             f'<div style="background:{d["bg2"]};border-radius:6px;padding:8px;color:{blk}">'
-            f'bg-2 のパネル {d["bg2"]}</div>'
+            f'bg-2 panel {d["bg2"]}</div>'
             f'<div style="margin-top:8px">{tint_rows()}</div>'
             f'</div>')
-    # 参考: Flexoki paper
+    # Flexoki paper remains a visual reference, not a candidate.
     h.append(f'<div class="card" style="background:#FFFCF0">'
-             f'<b style="color:{blk}">参考: Flexoki paper</b> <span class="small">#FFFCF0</span>'
-             f'<div class="wbox"><span style="color:{blk}">white カード上の本文。</span></div>'
-             f'<p style="color:{blk}">bg 直上の本文テキスト。</p>'
+             f'<b style="color:{blk}">Reference: Flexoki paper</b> <span class="small">#FFFCF0</span>'
+             f'<div class="wbox"><span style="color:{blk}">Body text on a white card.</span></div>'
+             f'<p style="color:{blk}">Body text directly on bg.</p>'
              f'<div style="margin-top:8px">{tint_rows()}</div></div>')
 
-    # --- base スケール (Phase 1 で neutral に確定) ---
-    h.append('<h2>2. base スケール（Phase 1 確定: neutral）</h2><div>')
+    # Neutral base scale.
+    h.append('<h2>2. base scale (Phase 1 final: neutral)</h2><div>')
     h.append(chip(pal['special']['white'], 'white'))
     for s in STEPS:
         h.append(chip(pal['base'][s]['hex'], f'base-{s}'))
     h.append(chip(pal['special']['black'], 'black'))
     h.append('</div>')
 
-    # --- アクセント一覧 ---
-    h.append('<h2>3. アクセント 8 色 × 13 段階</h2>')
+    # Accent scales.
+    h.append('<h2>3. Accent palette: 8 hues x 13 steps</h2>')
     for name in ACCENTS:
         h.append(f'<h3>{name}</h3><div>')
         for s in STEPS:
             h.append(chip(pal['accents'][name][s]['hex'], f'{s}'))
         h.append('</div>')
 
-    # --- ハイライター ---
-    h.append('<h2>3b. ハイライター (hl-*, 黒文字専用マーカー)</h2><div>')
+    # Highlighters.
+    h.append('<h2>3b. Highlighters (hl-*, marker colors for black text only)</h2><div>')
     for name in ACCENTS:
         h.append(chip(pal['highlight'][name]['hex'], f'hl-{name}'))
     h.append('</div>')
 
-    # --- コード階層デモ (plan.md §6.3) ---
-    h.append('<h2>4. コード階層デモ（§6.3 sparse highlighting）</h2>'
-             '<p class="small">Tier1 変数=tx（無彩色） / Tier2 定義=blue・キーワード=magenta / '
-             'Tier3 文字列=green・数値=purple / Tier4 コメント=tx-3</p>')
+    # Syntax hierarchy demo.
+    h.append('<h2>4. Code Hierarchy Demo (§6.3 sparse highlighting)</h2>'
+             '<p class="small">Tier 1 variables = tx (neutral) / '
+             'Tier 2 definitions = blue, keywords = magenta / '
+             'Tier 3 strings = green, numbers = purple / Tier 4 comments = tx-3</p>')
 
     def code_sample(bg, tx, tx2, tx3, kw, fn, st, num):
         return (f'<pre style="background:{bg};color:{tx}">'
-                f'<span style="color:{tx3}"># 残差ノルムの履歴を計算する</span>\n'
-                f'<span style="color:{kw}">def</span> <span style="color:{fn}">residual_history</span>(A, b, xs):\n'
-                f'    norms = []\n'
-                f'    <span style="color:{kw}">for</span> x <span style="color:{kw}">in</span> xs:\n'
-                f'        r = b <span style="color:{tx2}">-</span> A <span style="color:{tx2}">@</span> x\n'
-                f'        norms.append(np.linalg.norm(r) <span style="color:{tx2}">/</span> '
-                f'np.linalg.norm(b))\n'
-                f'    <span style="color:{kw}">return</span> norms  '
-                f'<span style="color:{tx3}"># 相対残差 &lt; </span>'
-                f'<span style="color:{num}">1e-12</span> <span style="color:{tx3}">で収束</span>\n'
-                f'    <span style="color:{st}">"restarted BiCGSTAB"</span></pre>')
+                f'<span style="color:{tx3}"># Build a display label for the public catalog</span>\n'
+                f'<span style="color:{kw}">def</span> <span style="color:{fn}">format_product_label</span>(item, locale):\n'
+                f'    total = item.price <span style="color:{tx2}">*</span> item.quantity\n'
+                f'    total = total <span style="color:{tx2}">*</span> <span style="color:{num}">1.10</span>\n'
+                f'    <span style="color:{kw}">if</span> locale <span style="color:{tx2}">==</span> '
+                f'<span style="color:{st}">"en"</span>:\n'
+                f'        <span style="color:{kw}">return</span> item.name <span style="color:{tx2}">+</span> '
+                f'<span style="color:{st}">" - $"</span> <span style="color:{tx2}">+</span> str(round(total, '
+                f'<span style="color:{num}">2</span>))\n'
+                f'    <span style="color:{kw}">return</span> item.name  '
+                f'<span style="color:{tx3}"># default label</span></pre>')
 
-    # ロール定義 (ROLES syntax_*) から描画し、roles.html / palette.json と常に同期させる
+    # Pull colors from ROLES so this preview stays aligned with generated themes.
     sd = {k: v['hex'] for k, v in pal['roles']['syntax_dark'].items()}
     sl = {k: v['hex'] for k, v in pal['roles']['syntax_light'].items()}
     dk = {k: v['hex'] for k, v in pal['roles']['dark'].items()}
-    h.append('<h3>ダーク（syntax_dark ロール / bg = black）</h3>')
+    h.append('<h3>Dark (syntax_dark role / bg = black)</h3>')
     h.append(code_sample(dk['bg'], sd['variable'], sd['operator'], sd['comment'],
                          sd['keyword'], sd['definition'], sd['string'], sd['number']))
-    h.append('<h3>ライト（syntax_light ロール / bg = bg）</h3>')
+    h.append('<h3>Light (syntax_light role / bg = bg)</h3>')
     h.append(code_sample(pal['bg']['bg'], sl['variable'], sl['operator'], sl['comment'],
                          sl['keyword'], sl['definition'], sl['string'], sl['number']))
     return ''.join(h)
@@ -411,15 +426,15 @@ def html_swatches(pal):
 # ============================================================
 
 def rate(w, lc):
-    """plan.md §3.4 / §5.1 の目標での判定"""
+    """Classify contrast using the WCAG/APCA targets from plan.md."""
     a = abs(lc)
     if w >= 7 and a >= 90:
-        return 'p2', '◎ 高'
+        return 'p2', 'High body'
     if w >= 4.5 and a >= 75:
-        return 'p1', '○ 低(quiet)可'
+        return 'p1', 'Quiet body OK'
     if w >= 3 and a >= 60:
-        return 'p0', '△ 大/太のみ'
-    return 'pf', '✕'
+        return 'p0', 'Large/bold only'
+    return 'pf', 'Fail'
 
 
 def matrix(title, fgs, bgs, note=''):
@@ -445,36 +460,41 @@ def html_contrast(pal):
     ac, bs = pal['accents'], pal['base']
     blk, wht = pal['special']['black'], pal['special']['white']
     h = [f'<!doctype html><meta charset="utf-8"><title>contrast</title><style>{CSS}</style>',
-         '<h1>コントラスト行列（WCAG 2.x + APCA Lc）</h1>',
-         '<p class="small">判定は plan.md の目標: ◎=高コントラスト本文可 (≥7:1 & |Lc|≥90) / '
-         '○=quiet 本文可 (≥4.5 & ≥75) / △=大・太字のみ (≥3 & ≥60) / ✕=装飾のみ</p>']
+         '<h1>Contrast Matrix (WCAG 2.x + APCA Lc)</h1>',
+         '<p class="small">Ratings follow the targets in plan.md: '
+         'High body = body text (≥7:1 & |Lc|≥90) / '
+         'Quiet body OK = quiet body text (≥4.5 & ≥75) / '
+         'Large/bold only = display or bold text only (≥3 & ≥60) / '
+         'Fail = decorative use only</p>']
 
     light_bgs = [('bg', pal['bg']['bg']), ('bg-2', pal['bg']['bg2']), ('white', wht)]
     light_fgs = ([('black', blk)]
                  + [(f'base-{s}', bs[s]['hex']) for s in (800, 700, 600)]
                  + [('tx-navy (blue-900)', ac['blue'][900]['hex'])]
                  + [(f'{n}-600', ac[n][600]['hex']) for n in ACCENTS])
-    h.append(matrix('ライトテーマ', light_fgs, light_bgs))
+    h.append(matrix('Light theme', light_fgs, light_bgs))
 
     dark_bgs = [('base-950', bs[950]['hex']), ('black', blk)]
     dark_fgs = ([('white', wht)]
                 + [(f'base-{s}', bs[s]['hex']) for s in (100, 200, 300)]
                 + [(f'{n}-400', ac[n][400]['hex']) for n in ACCENTS]
                 + [(f'{n}-300', ac[n][300]['hex']) for n in ('blue', 'green')])
-    h.append(matrix('ダークテーマ', dark_fgs, dark_bgs,
-                    'APCA は負値 (明るい文字 on 暗背景)。WCAG 2.x はダークで過大評価に注意 (plan.md §5.1)'))
+    h.append(matrix('Dark theme', dark_fgs, dark_bgs,
+                    'APCA is negative for light text on dark backgrounds. '
+                    'WCAG 2.x tends to overestimate dark-theme contrast (plan.md §5.1).'))
 
     tint_bgs = [(f'{n}-100', ac[n][100]['hex']) for n in ('red', 'blue', 'green', 'yellow')]
     tint_fgs = ([('black', blk)]
                 + [(f'{n}-800', ac[n][800]['hex']) for n in ('red', 'blue', 'green', 'yellow')])
-    h.append(matrix('淡色塗り (100) 上の文字', tint_fgs, tint_bgs,
-                    '同系統 800 を淡色 100 の上に置く運用 (plan.md §6.1) の妥当性チェック'))
+    h.append(matrix('Text on tint fills (100)', tint_fgs, tint_bgs,
+                    'Checks the planned use of same-hue 800 text on tint-100 fills (plan.md §6.1).'))
 
-    # --- 淡色帯 (50-200) 塗り判別: ΔEok vs bg (plan.md §4.4) ---
-    h.append('<h2>淡色帯 (50–200) の「塗り」判別性: ΔEok vs 背景</h2>'
-             '<p class="small">bg の上に枠線なしで置いたとき塗りと分かるか。'
-             '目安 ΔEok ≥ 0.02 (plan.md §4.4)。投影では消えうる前提で枠線 or L 差併用 (§5.4)</p>')
-    h.append('<table><tr><th>色 \\ 塗り</th>')
+    # Tint visibility is checked separately because WCAG/APCA do not model fills.
+    h.append('<h2>Tint Fill Visibility (50-200): ΔEok vs Background</h2>'
+             '<p class="small">Checks whether a fill remains visible on bg without a border. '
+             'The screening threshold is ΔEok ≥ 0.02 (plan.md §4.4). '
+             'Projection can still erase these fills, so use a border or luminance gap as needed (§5.4).</p>')
+    h.append('<table><tr><th>color \\ fill</th>')
     for s in (50, 100, 150, 200):
         h.append(f'<th>{s}</th>')
     h.append('</tr>')
@@ -485,22 +505,22 @@ def html_contrast(pal):
             hx = ac[n][s]['hex']
             d = deltaE_ok(hx, bgh)
             cls = 'p2' if d >= 0.02 else 'pf'
-            mark = '○' if d >= 0.02 else '✕'
+            mark = 'OK' if d >= 0.02 else 'Fail'
             h.append(f'<td class="{cls}" style="background:{hx}">'
                      f'{hx}<br>ΔE {d:.3f} {mark}</td>')
         h.append('</tr>')
     h.append('</table>')
 
-    # --- ハイライター上の黒文字 (規約: base 文字専用) ---
+    # Highlighters must preserve body-grade black-text contrast.
     hl_bgs = [(f'hl-{n}', pal['highlight'][n]['hex']) for n in ACCENTS]
-    h.append(matrix('ハイライター (hl-*) 上の黒文字', [('black', blk)], hl_bgs,
-                    'マーカー線は tx (black) とその太字の下にのみ引く規約。'
-                    '本文級 ◎ (≥7:1 & |Lc|≥90) が必須'))
+    h.append(matrix('Black Text on Highlighters (hl-*)', [('black', blk)], hl_bgs,
+                    'Marker lines are allowed only behind tx (black) and its bold form. '
+                    'Body-grade contrast (≥7:1 & |Lc|≥90) is required.'))
 
-    # --- 淡色帯の「文字」用途: 同系統の濃色背景上で APCA 検証 (plan.md §4.4) ---
-    h.append('<h2>淡色帯 (50–200) の「文字」用途: 同系統濃色 (700–950) 上の APCA</h2>'
-             '<p class="small">quiet 本文級 |Lc| ≥ 75 で○。'
-             '「red-100 は red-800 以深の上でのみ文字可」の形の用途表 (plan.md §4.4)</p>')
+    # Tint steps may be text only on much darker same-hue backgrounds.
+    h.append('<h2>Tint Steps (50-200) as Text: APCA on Same-Hue Dark Backgrounds (700-950)</h2>'
+             '<p class="small">Marked OK at quiet body grade |Lc| ≥ 75. '
+             'This documents use rules such as red-100 text only on red-800 or darker (plan.md §4.4).</p>')
     for n in ACCENTS:
         fgs = [(f'{n}-{s}', ac[n][s]['hex']) for s in (50, 100, 150, 200)]
         bgs = [(f'{n}-{s}', ac[n][s]['hex']) for s in (700, 800, 850, 900, 950)]
@@ -509,26 +529,28 @@ def html_contrast(pal):
 
 
 # ============================================================
-# cvd.html (plan.md §5.1 CVD シミュレーション)
+# cvd.html (plan.md §5.1 CVD simulation)
 # ============================================================
-CVD_KINDS = [('原色 (シミュレーションなし)', None), ('P型 (protanopia)', 'protan'),
-             ('D型 (deuteranopia)', 'deutan'), ('T型 (tritanopia)', 'tritan')]
+CVD_KINDS = [('Original (no simulation)', None), ('Protanopia', 'protan'),
+             ('Deuteranopia', 'deutan'), ('Tritanopia', 'tritan')]
 
-# カテゴリカルな取り違えリスクの目安 (ΔEok)。経験的な閾値であり最終判断は目視
+# These empirical ΔEok thresholds only screen category-confusion risk.
 CVD_DE_BAD, CVD_DE_WARN = 0.04, 0.08
 
 
 def html_cvd(pal):
     ac = pal['accents']
     h = [f'<!doctype html><meta charset="utf-8"><title>cvd</title><style>{CSS}</style>',
-         '<h1>CVD シミュレーション (Machado 2009, severity 1.0)</h1>',
-         '<p class="small">plan.md §5.1: 強調 (red/blue)・サブ (green/orange/yellow) が'
-         '色相のみに依存しない設計かの確認。ΔEok ペア距離: '
-         f'✕ &lt; {CVD_DE_BAD} (取り違えリスク大) / △ &lt; {CVD_DE_WARN} / ○ それ以上。'
-         'あくまで目安で、最終判断はスウォッチ目視 + 実運用 (色だけに意味を載せない原則 §1)</p>']
+         '<h1>CVD Simulation (Machado 2009, severity 1.0)</h1>',
+         '<p class="small">plan.md §5.1: checks whether emphasis colors (red/blue) and '
+         'secondary accents (green/orange/yellow) do not rely on hue alone. '
+         'ΔEok pair distance: '
+         f'Fail &lt; {CVD_DE_BAD} (high confusion risk) / Warn &lt; {CVD_DE_WARN} / OK otherwise. '
+         'These are screening thresholds; final decisions still require swatch review and real use, '
+         'with no meaning carried by color alone (§1).</p>']
 
-    for step, usage in ((600, 'ライトの強調・シンタックス帯'),
-                        (400, '図形・グラフ帯 / ダークのシンタックス帯 (plan.md §6.1, §6.3)')):
+    for step, usage in ((600, 'light emphasis and syntax band'),
+                        (400, 'shape/chart band and dark syntax band (plan.md §6.1, §6.3)')):
         h.append(f'<h2>step {step} — {usage}</h2>')
         for label, kind in CVD_KINDS:
             h.append(f'<h3>{label}</h3><div>')
@@ -537,7 +559,7 @@ def html_cvd(pal):
                 sim = cvd_hex(hx, kind) if kind else hx
                 h.append(chip(sim, n))
             h.append('</div>')
-            # ペア距離行列
+            # Pairwise distances expose hue pairs that need non-color encodings.
             sims = {n: (cvd_hex(ac[n][step]['hex'], kind) if kind else ac[n][step]['hex'])
                     for n in ACCENTS}
             names = list(ACCENTS)
@@ -561,13 +583,13 @@ def html_cvd(pal):
             h.append('</table>')
             if worst:
                 worst.sort()
-                h.append('<p class="small">要注意ペア: '
+                h.append('<p class="small">Watch pairs: '
                          + ', '.join(f'{a}–{b} ({d:.3f})' for d, a, b in worst) + '</p>')
     return ''.join(h)
 
 
 # ============================================================
-# roles.html (plan.md §6 のマッピング表 + 用途モック)
+# roles.html (plan.md §6 role tables and usage mocks)
 # ============================================================
 
 def html_roles(pal):
@@ -576,13 +598,13 @@ def html_roles(pal):
     li, hi, qu = R['light'], R['light_high'], R['light_quiet']
     da, pr, md, sl = R['dark'], R['presentation'], R['markdown'], R['syntax_light']
     h = [f'<!doctype html><meta charset="utf-8"><title>roles</title><style>{CSS}</style>',
-         '<h1>ロールマッピング (Phase 3 ドラフト)</h1>',
-         '<p class="small">plan.md §6。photo-surface / ダークギャラリーは仮決め (§9 未決)。'
-         '正は build.py の ROLES 定数 → palette.json roles</p>']
+         '<h1>Role Mapping (Phase 3 Draft)</h1>',
+         '<p class="small">plan.md §6. photo-surface and the dark gallery surface are provisional '
+         '(§9 open items). The source of truth is build.py ROLES -> palette.json roles.</p>']
 
-    # --- ロール表 ---
+    # Role table.
     for group, roles in pal['roles'].items():
-        h.append(f'<h2>{group}</h2><table><tr><th>ロール</th><th>参照</th><th>hex</th><th>見本</th></tr>')
+        h.append(f'<h2>{group}</h2><table><tr><th>Role</th><th>Reference</th><th>Hex</th><th>Sample</th></tr>')
         for k, v in roles.items():
             if k == 'scrim':
                 continue
@@ -590,22 +612,23 @@ def html_roles(pal):
                      f'<td style="background:{v["hex"]}">&nbsp;&nbsp;&nbsp;&nbsp;</td></tr>')
         h.append('</table>')
 
-    # --- プレゼンモック ---
-    h.append('<h2>モック 1: スライド (light_high + presentation)</h2>')
+    # Slide mock.
+    h.append('<h2>Mock 1: Slide (light_high + presentation)</h2>')
     h.append(
         f'<div style="width:640px;aspect-ratio:16/9;background:{li["bg"]};border:1px solid #DDD;'
         f'border-radius:8px;padding:28px;box-sizing:border-box">'
         f'<div style="font-size:22px;font-weight:700;color:{hi["tx"]}">'
-        f'Krylov 部分空間法の収束性</div>'
+        f'Accessible Color Roles</div>'
         f'<div style="font-size:12px;color:{hi["tx-2"]};margin:4px 0 14px">'
-        f'第 3 回 数値線形代数セミナー</div>'
-        f'<div style="font-size:14px;color:{hi["tx"]}">前処理行列 M の選択が'
-        f'<b style="color:{pr["emphasis-1"]}">収束速度を支配</b>する。'
-        f'条件数が大きい場合は<b style="color:{pr["emphasis-2"]}">破綻に注意</b>。</div>'
+        f'Public sample slide</div>'
+        f'<div style="font-size:14px;color:{hi["tx"]}">Body text, emphasis, warnings, and notes '
+        f'stay predictable when each <b style="color:{pr["emphasis-1"]}">visual role is fixed</b>. '
+        f'This mock keeps a Japanese check phrase: '
+        f'<b style="color:{pr["emphasis-2"]}">状態の優先度</b> は色だけで伝えない。</div>'
         f'<div style="background:{pr["note-fill"]};color:{pr["note-text"]};border-radius:6px;'
-        f'padding:8px 12px;margin:12px 0;font-size:13px">注意: 丸め誤差により直交性が失われる</div>'
+        f'padding:8px 12px;margin:12px 0;font-size:13px">Warning: do not rely on color alone / 色だけで伝えない</div>'
         f'<div style="background:{pr["info-fill"]};color:{pr["info-text"]};border-radius:6px;'
-        f'padding:8px 12px;font-size:13px">補足: 再直交化で回復できる (コスト増)</div>'
+        f'padding:8px 12px;font-size:13px">Note: pair color with icons or short labels.</div>'
         f'<div style="display:flex;gap:6px;align-items:center;margin-top:12px">'
         f'<span style="font-size:11px;color:{hi["tx-2"]}">chart 1–7:</span>'
         + ''.join(f'<span style="display:inline-block;width:34px;height:8px;border-radius:2px;'
@@ -613,38 +636,39 @@ def html_roles(pal):
                   for i in range(1, 8))
         + '</div>'
         f'<div style="margin-top:10px;font-size:11px;color:{hi["tx-3"]}">'
-        f'2026-07-04 / lucretia theme draft</div></div>')
+        f'public preview / sample content</div></div>')
 
-    # --- Markdown モック ---
-    h.append('<h2>モック 2: Markdown エディタ (light_high + markdown)</h2>')
+    # Markdown mock.
+    h.append('<h2>Mock 2: Markdown Editor (light_high + markdown)</h2>')
     h.append(
         f'<div style="width:560px;background:{li["bg"]};border:1px solid #DDD;border-radius:8px;'
         f'padding:20px 24px;color:{md["body"]};font-size:14px;line-height:1.7">'
         f'<div style="font-size:19px;font-weight:700;color:{md["heading"]};'
-        f'border-bottom:1px solid {md["hr"]};padding-bottom:6px">収束判定の実装メモ</div>'
-        f'<p>相対残差は <code style="background:{md["code-inline-bg"]};border-radius:3px;'
-        f'padding:1px 5px">norm(r) / norm(b)</code> で計算する。'
-        f'詳細は <a style="color:{md["link"]}">Saad (2003)</a> を参照。</p>'
-        f'<p>ハイライター: '
-        f'<mark style="background:{R["highlight"]["yellow"]};padding:0 2px">既定は黄</mark>、'
+        f'border-bottom:1px solid {md["hr"]};padding-bottom:6px">Design Memo / デザインメモ</div>'
+        f'<p>Separating links, body copy, and inline code keeps '
+        f'<code style="background:{md["code-inline-bg"]};border-radius:3px;'
+        f'padding:1px 5px">--color-accent</code> and other 短いトークン legible. '
+        f'See <a style="color:{md["link"]}">documentation</a> for details.</p>'
+        f'<p>Highlighters: '
+        f'<mark style="background:{R["highlight"]["yellow"]};padding:0 2px">default yellow</mark>, '
         f'<mark style="background:{R["highlight"]["green"]};padding:0 2px">補助に緑</mark>、'
         f'<mark style="background:{R["highlight"]["blue"]};padding:0 2px">'
-        f'<b>太字にも引ける</b></mark>、'
-        f'<mark style="background:{R["highlight"]["red"]};padding:0 2px">注意は赤</mark>。'
-        f'黒文字専用 (規約)。</p>'
+        f'<b>works under bold text</b></mark>, '
+        f'<mark style="background:{R["highlight"]["red"]};padding:0 2px">warning red</mark>. '
+        f'Black text only.</p>'
         f'<div style="border-left:3px solid {md["quote-border"]};color:{md["quote-text"]};'
-        f'padding-left:12px;margin:10px 0">停止基準は問題のスケールに依存してはならない。</div>'
+        f'padding-left:12px;margin:10px 0">重要な状態は色だけでなく、ラベルでも示す。</div>'
         f'<pre style="background:{md["code-block-bg"]};color:{sl["variable"]};margin:0">'
-        f'<span style="color:{sl["keyword"]}">if</span> res <span style="color:{sl["operator"]}">&lt;</span> '
-        f'<span style="color:{sl["number"]}">1e-12</span>:\n'
+        f'<span style="color:{sl["keyword"]}">if</span> score <span style="color:{sl["operator"]}">&lt;</span> '
+        f'<span style="color:{sl["number"]}">0.8</span>:\n'
         f'    <span style="color:{sl["keyword"]}">return</span> '
-        f'<span style="color:{sl["string"]}">"converged"</span></pre></div>')
+        f'<span style="color:{sl["string"]}">"Needs review"</span></pre></div>')
 
-    # --- コードエディタモック (VS Code 風) ---
-    h.append('<h2>モック 3: コードエディタ (syntax_light / syntax_dark + dist/vscode 相当)</h2>'
-             '<p class="small">§6.3 sparse highlighting: 変数・呼び出しは無彩色 (Tier 1)、'
-             '彩色は キーワード=magenta / 定義=blue / 文字列=green / 数値=purple のみ。'
-             '下段はターミナル ANSI (normal / bright)</p>')
+    # Code editor mock.
+    h.append('<h2>Mock 3: Code Editor (syntax_light / syntax_dark + dist/vscode equivalent)</h2>'
+             '<p class="small">§6.3 sparse highlighting: variables and calls stay neutral (Tier 1); '
+             'only keywords = magenta, definitions = blue, strings = green, and numbers = purple receive hue. '
+             'The lower band shows terminal ANSI colors (normal / bright).</p>')
 
     def editor_mock(kind):
         light = kind == 'light'
@@ -660,35 +684,33 @@ def html_roles(pal):
         N = lambda t: f'<span style="color:{syn["number"]}">{t}</span>'
         O = lambda t: f'<span style="color:{syn["operator"]}">{t}</span>'
         C = lambda t: f'<span style="color:{syn["comment"]};font-style:italic">{t}</span>'
-        # 全シンタックスロールが登場するサンプル:
-        #   変数=tx / 定義(class,def)=blue / キーワード=magenta / 文字列・docstring=green
-        #   数値・True/None=purple / 演算子=operator / コメント=comment
+        # The sample touches every syntax role while staying domain-neutral.
+        # Variables remain tx; other token classes exercise their assigned hue.
         lines = [
-            f'{K("import")} numpy {K("as")} np',
+            f'{K("import")} json',
             '',
-            C('# 前処理付き反復解法。収束履歴を持つ (Tier 4: コメント)'),
-            f'{K("class")} {F("IterativeSolver")}:',
-            f'    {S("&quot;&quot;&quot;Krylov 系ソルバの基底クラス&quot;&quot;&quot;")}',
-            f'    {K("def")} {F("__init__")}(self, A, M{O("=")}{N("None")}, '
-            f'tol{O("=")}{N("1e-10")}, maxiter{O("=")}{N("500")}):',
-            f'        self.A, self.M {O("=")} A, M',
-            f'        self.tol, self.maxiter {O("=")} tol, maxiter',
-            f'        self.converged {O("=")} {N("False")}',
-            f'        self.name {O("=")} {S("&quot;PCG&quot;")}',
+            C('# Small UI model for the public preview (Tier 4 comment)'),
+            f'{K("class")} {F("ProductCard")}:',
+            f'    {S("&quot;&quot;&quot;Small data object used by the theme preview.&quot;&quot;&quot;")}',
+            f'    {K("def")} {F("__init__")}(self, title, price{O("=")}{N("29.0")}, '
+            f'featured{O("=")}{N("False")}):',
+            f'        self.title {O("=")} title',
+            f'        self.price {O("=")} price',
+            f'        self.featured {O("=")} featured',
+            f'        self.label {O("=")} {S("&quot;New&quot;")}',
             '',
-            f'    {K("def")} {F("solve")}(self, b, x0{O("=")}{N("None")}):',
-            f'        x {O("=")} x0 {K("if")} x0 {K("is")} {K("not")} {N("None")} '
-            f'{K("else")} np.zeros_like(b)',
-            f'        r {O("=")} b {O("-")} self.A {O("@")} x',
-            f'        {K("for")} k {K("in")} {F("range")}(self.maxiter):',
-            f'            x, r {O("=")} self.step(x, r, omega{O("=")}{N("0.5")})',
-            f'            {K("if")} <span style="background:{sel}">np.linalg.norm(r)</span> '
-            f'{O("&lt;")} self.tol {O("*")} np.linalg.norm(b):',
-            f'                self.converged {O("=")} {N("True")}',
-            f'                {K("return")} x, k  ' + C('# 相対残差で収束判定'),
-            f'        {K("raise")} {F("RuntimeError")}({S("f&quot;diverged: iter={{k}}&quot;")})',
+            f'    {K("def")} {F("render")}(self, theme, discount{O("=")}{N("None")}):',
+            f'        ratio {O("=")} {N("1.0")} {K("if")} discount {K("is")} {N("None")} '
+            f'{K("else")} discount',
+            f'        total {O("=")} self.price {O("*")} ratio',
+            f'        {K("for")} index {K("in")} {F("range")}({N("3")}):',
+            f'            total {O("=")} total {O("+")} index {O("*")} {N("0.5")}',
+            f'            {K("if")} <span style="background:{sel}">total</span> {O("&lt;")} {N("20.0")}:',
+            f'                self.featured {O("=")} {N("True")}',
+            f'                {K("return")} theme.color({S("&quot;accent&quot;")}), total  ' + C('# sample branch'),
+            f'        {K("raise")} {F("ValueError")}({S("&quot;price is outside the preview range&quot;")})',
         ]
-        hl_line = 15  # 0-origin: self.step の行をカレント行に
+        hl_line = 15  # 0-origin current-line highlight for the sample loop.
         rows = []
         for i, ln in enumerate(lines):
             lnc = tx2 if i == hl_line else tx3
@@ -698,7 +720,7 @@ def html_roles(pal):
                 f'<span style="width:34px;text-align:right;padding-right:12px;'
                 f'color:{lnc};user-select:none;flex-shrink:0">{i + 1}</span>'
                 f'<span style="color:{tx};white-space:pre">{ln or " "}</span></div>')
-        # ターミナル ANSI 帯
+        # ANSI chips verify terminal colors next to the editor roles.
         band_n, band_b = (600, 400) if light else (300, 200)
         ansi_chips = ''
         for band, lab in ((band_n, 'normal'), (band_b, 'bright')):
@@ -715,16 +737,16 @@ def html_roles(pal):
             f'<div style="display:inline-block;vertical-align:top;margin:8px;width:560px;'
             f'border:1px solid #CCC;border-radius:8px;overflow:hidden;'
             f'font-family:ui-monospace,\'SF Mono\',Menlo,monospace;font-size:12px">'
-            # タブバー
+            # Tab bar.
             f'<div style="display:flex;background:{ebg2};font-size:11px">'
-            f'<span style="background:{ebg};color:{tx};padding:6px 14px">pcg.py</span>'
-            f'<span style="color:{tx2};padding:6px 14px">solver_test.py</span></div>'
-            # エディタ本体
+            f'<span style="background:{ebg};color:{tx};padding:6px 14px">product_card.py</span>'
+            f'<span style="color:{tx2};padding:6px 14px">theme_preview.py</span></div>'
+            # Editor body.
             f'<div style="background:{ebg};padding:10px 0;line-height:1.65">{"".join(rows)}</div>'
-            # ターミナル
+            # Terminal.
             f'<div style="background:{ebg};border-top:1px solid {ui["ui-3"]};padding:8px 12px">'
             f'<span style="color:{tx3};font-size:10px">TERMINAL (ANSI)</span>{ansi_chips}</div>'
-            # ステータスバー
+            # Status bar.
             f'<div style="background:{ebg2};color:{tx2};font-size:10px;'
             f'padding:4px 12px">{name} — Python · UTF-8 · Ln 16, Col 13</div>'
             f'</div>')
@@ -732,29 +754,31 @@ def html_roles(pal):
     h.append(editor_mock('light'))
     h.append(editor_mock('dark'))
 
-    # --- ギャラリーモック ---
-    h.append('<h2>モック 4: ギャラリー (photo-surface + scrim)</h2>'
-             '<p class="small">実写画像は assets/photos/photo-{1,2,3}.jpg から読む'
-             '（無ければグラデーションにフォールバック）。1=明るい昼景 / 2=暗部主体 / '
-             '3=色数の多い街 のワーストケース 3 種 (plan.md §6.4)</p>')
-    # CSS 多重背景: 画像が無ければ後ろのグラデーションが見える
+    # Gallery mock.
+    h.append('<h2>Mock 4: Gallery (photo-surface + scrim)</h2>'
+             '<p class="small">Uses real photos to check photo-adjacent surfaces and scrims across '
+             'bright, dark, and colorful image areas (plan.md §6.4).</p>')
+    # CSS layered backgrounds keep the page robust when a checkout does not have
+    # the photo fixtures. The captions stay generic so the committed preview does
+    # not turn into a personal photo essay; the images only provide luminance and
+    # color variation for checking the gallery roles.
     photos = [
         ('../assets/photos/photo-1.jpg',
          'linear-gradient(135deg,#7A8A99 0%,#C9B8A0 55%,#E8DCC8 100%)',
-         '明るい昼景 — scrim black 60%'),
+         'Bright area / 明るい面 - black scrim 60%'),
         ('../assets/photos/photo-2.jpg',
          'linear-gradient(160deg,#0A0A0A 0%,#2E2E2E 60%,#6E6E6E 100%)',
-         '暗部主体 (B&W) — scrim black 60%'),
+         'Dark area / 暗い面 - black scrim 60%'),
         ('../assets/photos/photo-3.jpg',
          'linear-gradient(160deg,#2E3B33 0%,#8A3B2E 60%,#B98F55 100%)',
-         '色数の多い街 — scrim black 60%'),
+         'Colorful area / 多色面 - black scrim 60%'),
     ]
     sc = pal['roles']['gallery']['scrim']
     ga = R['gallery']
     ps_l = pal['roles']['light']['photo-surface']['ref']
     ps_d = pal['roles']['dark']['photo-surface']['ref']
-    for label, surface, txc in ((f'ライト (photo-surface = {ps_l})', li['photo-surface'], hi),
-                                (f'ダーク (photo-surface = {ps_d})', da['photo-surface'],
+    for label, surface, txc in ((f'Light (photo-surface = {ps_l})', li['photo-surface'], hi),
+                                (f'Dark (photo-surface = {ps_d})', da['photo-surface'],
                                  {'tx': da['tx'], 'tx-2': da['tx-2'], 'tx-3': da['tx-3']})):
         h.append(
             f'<div class="card" style="background:{surface};width:360px">'
@@ -768,14 +792,14 @@ def html_roles(pal):
                 f'<div style="position:absolute;top:6px;left:6px;background:{sc["black"][40]};'
                 f'color:#FFF;font-size:11px;padding:2px 8px;border-radius:3px">scrim 40%</div>'
                 f'</div>'
-                f'<div style="color:{ga["caption"]};font-size:12px;margin:4px 0 0">キャプション (caption)</div>'
+                f'<div style="color:{ga["caption"]};font-size:12px;margin:4px 0 0">Caption / キャプション (caption)</div>'
                 f'<div style="color:{ga["meta"]};font-size:11px">f/8 · 1/250s · ISO 100 (meta)</div>')
         h.append('</div>')
     return ''.join(h)
 
 
 # ============================================================
-# paper.html (plan.md §6.5 lucretia paper: bg 候補比較 + 読書モック + コントラスト)
+# paper.html (plan.md §6.5 reading profile review)
 # ============================================================
 
 def html_paper(pal):
@@ -785,22 +809,20 @@ def html_paper(pal):
          for g in ('paper', 'syntax_paper', 'markdown_paper', 'highlight')}
     pa, syn, md = R['paper'], R['syntax_paper'], R['markdown_paper']
     h = [f'<!doctype html><meta charset="utf-8"><title>paper</title><style>{CSS}</style>',
-         '<h1>lucretia paper — 長文読書プロファイル (plan.md §6.5)</h1>',
-         '<p class="small">目的: 紙で読む快適さ (低輝度・暖色・非ギラつき) のデジタル近似。'
-         'プレゼン・ギャラリーは対象外。bg = P2 (生成り) に確定 (plan.md §9-16)</p>']
+         '<h1>lucretia paper - Long-Form Reading Profile (plan.md §6.5)</h1>',
+         '<p class="small">Goal: a digital approximation of paper-like reading comfort '
+         '(lower luminance, warm surface, low glare). Presentation and gallery use are out of scope. '
+         'bg is finalized as P2 (natural paper tone) (plan.md §9-16).</p>']
 
-    # --- 1. 確定 bg のプレビュー (参考: 現行 bg / Flexoki paper と並置) ---
-    h.append('<h2>1. 確定 bg (P2) — 同一の読書サンプルで参考色と並置</h2>')
-    long_p = ('反復法の収束は前処理行列の品質に支配される。理論上の収束次数が同じでも、'
-              '固有値分布の裾が重い問題では実効的な反復回数が桁で変わることがある。'
-              'したがって実装では、残差ノルムの推移を必ず記録し、停滞 (stagnation) を'
-              '検出したら再スタートまたは前処理の再構成を行う。')
+    # Compare the final paper bg with useful references under identical text.
+    h.append('<h2>1. Final bg (P2) - Compared with Reference Colors Using the Same Reading Sample</h2>')
+    long_p = READING_SAMPLE
     o = P['oklch']
-    refs = [('paper-bg (確定 P2)', P['bg'], f'({o[0]}, {o[1]}, {o[2]}°)'),
-            ('現行 bg', pal['bg']['bg'], '(0.990, 0.006, 95°)'),
+    refs = [('paper-bg (final P2)', P['bg'], f'({o[0]}, {o[1]}, {o[2]}°)'),
+            ('current bg', pal['bg']['bg'], '(0.990, 0.006, 95°)'),
             ('Flexoki paper', '#FFFCF0', '(0.990, 0.016, 95°)')]
     for name, bgh, oklch in refs:
-        mark = ' ★' if bgh == P['bg'] else ''
+        mark = ' [selected]' if bgh == P['bg'] else ''
         h.append(
             f'<div class="card" style="background:{bgh};width:340px">'
             f'<b style="color:{pa["tx"]}">{name}{mark}</b> '
@@ -808,65 +830,66 @@ def html_paper(pal):
             f'{deltaE_ok(bgh, WHITE):.3f}</span>'
             f'<p style="color:{pa["tx"]};font-size:13.5px;line-height:1.9;margin:8px 0">'
             f'{long_p}</p>'
-            f'<p style="color:{pa["tx-2"]};font-size:12px;margin:4px 0">サブテキスト: '
-            f'Saad (2003) 6.4 節、<a style="color:{pa["link"]}">リンクの見え</a>、'
+            f'<p style="color:{pa["tx-2"]};font-size:12px;margin:4px 0">Secondary text: '
+            f'notes, <a style="color:{pa["link"]}">link rendering</a>, '
             f'<code style="background:{md["code-inline-bg"]};border-radius:3px;'
-            f'padding:1px 5px;color:{pa["tx"]}">norm(r)/norm(b)</code></p>'
+            f'padding:1px 5px;color:{pa["tx"]}">inline-token</code></p>'
             f'<div style="background:{md["code-block-bg"]};border-radius:5px;padding:6px 10px;'
-            f'font-size:11.5px;color:{pa["tx-2"]}">bg-2 相当の面 (コードブロック地)</div>'
+            f'font-size:11.5px;color:{pa["tx-2"]}">bg-2-like surface (code block background)</div>'
             f'</div>')
 
-    # --- 2. 暖色 base スケール ---
-    h.append('<h2>2. pbase スケール (暖色 H=92。neutral base は暖色 bg 上で青白く浮く)</h2><div>')
+    # Warm paper base scale.
+    h.append('<h2>2. pbase scale (warm H=92; neutral base looks bluish on warm bg)</h2><div>')
     for s in STEPS:
         h.append(chip(pb[s], f'pbase-{s}'))
-    h.append('</div><div style="margin-top:6px">比較: neutral base')
+    h.append('</div><div style="margin-top:6px">Comparison: neutral base')
     for s in (500, 700, 900):
         h.append(chip(pal['base'][s]['hex'], f'base-{s}'))
     h.append('</div>')
 
-    # --- 3. コントラスト行列 ---
+    # Paper contrast matrix.
     pfgs = ([('tx (pbase-900)', pa['tx']), ('tx-2 (pbase-700)', pa['tx-2']),
-             ('tx-3 (pbase-500)', pa['tx-3']), ('black (参考)', pal['special']['black'])]
+             ('tx-3 (pbase-500)', pa['tx-3']), ('black (reference)', pal['special']['black'])]
             + [(f'{n}-600', pal['accents'][n][600]['hex']) for n in ACCENTS])
     pbgs = [('paper-bg', P['bg']), ('paper-bg2', P['bg2'])]
-    h.append(matrix('3. paper ロールのコントラスト', pfgs, pbgs,
-                    'tx は「書籍インク」帯: ◎ (≥7:1 & |Lc|≥90) を満たしつつ black の'
-                    'ハレーションを避ける。シンタックス 600 帯は現行ライトと同水準'))
+    h.append(matrix('3. Contrast for paper roles', pfgs, pbgs,
+                    'tx is the book-ink band: it reaches High body (≥7:1 & |Lc|≥90) '
+                    'while avoiding the glare of black. Syntax step 600 stays at the same '
+                    'level as the current light theme.'))
 
-    # --- 4. Markdown 読書モック ---
-    h.append('<h2>4. 読書モック (markdown_paper + ハイライター)</h2>')
+    # Reading mock.
+    h.append('<h2>4. Reading Mock (markdown_paper + highlighters)</h2>')
     h.append(
         f'<div style="width:600px;background:{P["bg"]};border:1px solid #DDD;border-radius:8px;'
         f'padding:26px 30px;color:{md["body"]};font-size:14.5px;line-height:1.95">'
         f'<div style="font-size:20px;font-weight:700;color:{md["heading"]};'
-        f'border-bottom:1px solid {md["hr"]};padding-bottom:8px">Krylov 部分空間法 — 読書ノート</div>'
+        f'border-bottom:1px solid {md["hr"]};padding-bottom:8px">Long-Form Reading Sample</div>'
         f'<p>{long_p}</p>'
         f'<p><mark style="background:{R["highlight"]["yellow"]};padding:0 2px;color:{md["body"]}">'
-        f'停止基準は問題のスケールに依存してはならない</mark>。これは相対残差 '
+        f'Important sentences keep the body text color and use only the marker layer</mark>. This works like '
         f'<code style="background:{md["code-inline-bg"]};border-radius:3px;padding:1px 5px">'
-        f'norm(r) / norm(b)</code> を使う理由でもある。詳細は '
-        f'<a style="color:{md["link"]}">Saad (2003)</a> を参照。</p>'
+        f'line-height</code> and spacing: it makes rereading easier. See '
+        f'<a style="color:{md["link"]}">reading notes</a> for details.</p>'
         f'<div style="border-left:3px solid {md["quote-border"]};color:{md["quote-text"]};'
-        f'padding-left:14px;margin:12px 0">丸め誤差により直交性が失われる場合、'
-        f'再直交化で回復できるがコストは増える。</div>'
+        f'padding-left:14px;margin:12px 0">Quotes and side notes sit one step below the body copy '
+        f'so they do not interrupt long paragraphs.</div>'
         f'<pre style="background:{md["code-block-bg"]};color:{syn["variable"]};margin:0">'
-        f'<span style="color:{syn["keyword"]}">if</span> res '
+        f'<span style="color:{syn["keyword"]}">if</span> contrast '
         f'<span style="color:{syn["operator"]}">&lt;</span> '
-        f'<span style="color:{syn["number"]}">1e-12</span>:\n'
+        f'<span style="color:{syn["number"]}">4.5</span>:\n'
         f'    <span style="color:{syn["keyword"]}">return</span> '
-        f'<span style="color:{syn["string"]}">"converged"</span>  '
-        f'<span style="color:{syn["comment"]};font-style:italic"># 相対残差で判定</span></pre>'
+        f'<span style="color:{syn["string"]}">"review"</span>  '
+        f'<span style="color:{syn["comment"]};font-style:italic"># sample threshold</span></pre>'
         f'</div>')
     return ''.join(h)
 
 
 # ============================================================
-# tokens.css (plan.md §7: palette.json から CSS variables を生成)
+# tokens.css (CSS variables generated from palette.json)
 # ============================================================
 
 def gen_tokens_css(pal):
-    ln = ['/* lucretia color theme — generated by scripts/build.py. 手編集しない */',
+    ln = ['/* lucretia color theme - generated by scripts/build.py. Do not edit by hand. */',
           ':root {',
           f'  --lu-white: {pal["special"]["white"]};',
           f'  --lu-black: {pal["special"]["black"]};',
@@ -905,13 +928,13 @@ def gen_tokens_css(pal):
 
 
 # ============================================================
-# degrade.html (plan.md §5.4 劣化シミュレーション)
+# degrade.html (plan.md §5.4 degradation simulation)
 # ============================================================
 DEGRADE_MODES = [
-    ('original', '原色', None),
-    ('desat', '彩度 -20% (色ずれプロジェクタ)', 'desat'),
-    ('gamma', 'ガンマ 1.25 (中間調が沈む)', 'gamma'),
-    ('lifted', '黒浮き + レンジ圧縮 (安価な投影)', 'lifted'),
+    ('original', 'Original', None),
+    ('desat', 'Saturation -20% (color-shifted projector)', 'desat'),
+    ('gamma', 'Gamma 1.25 (darker midtones)', 'gamma'),
+    ('lifted', 'Black lift + range compression (budget projection)', 'lifted'),
 ]
 
 
@@ -930,33 +953,33 @@ def html_degrade(pal):
     hi = {k: v['hex'] for k, v in pal['roles']['light_high'].items()}
     pr = {k: v['hex'] for k, v in pal['roles']['presentation'].items()}
     h = [f'<!doctype html><meta charset="utf-8"><title>degrade</title><style>{CSS}</style>',
-         '<h1>劣化シミュレーション (plan.md §5.4)</h1>',
-         '<p class="small">投影・安価モニタで起きる劣化の簡易スクリーニング。'
-         '実プロジェクタでの確認の代替ではない。淡色塗りが消えないか・'
-         'サブテキストが読めるかを比較する</p>']
+         '<h1>Degradation Simulation (plan.md §5.4)</h1>',
+         '<p class="small">A quick screening view for degradation from projection and budget monitors. '
+         'It is not a substitute for checking a real projector. Compare whether tint fills remain visible '
+         'and secondary text remains readable.</p>']
     for key, label, mode in DEGRADE_MODES:
         d = lambda x: degrade(x, mode)
         bg = d(pal['bg']['bg'])
         h.append(
             f'<div class="card" style="background:{bg}">'
             f'<b style="color:{d(hi["tx"])}">{label}</b>'
-            f'<p style="color:{d(hi["tx"])};margin:6px 0;font-size:13px">本文テキスト。'
-            f'<span style="color:{d(hi["tx-2"])}">サブテキスト。</span>'
-            f'<span style="color:{d(hi["tx-3"])}">faint。</span></p>'
+            f'<p style="color:{d(hi["tx"])};margin:6px 0;font-size:13px">Body text. '
+            f'<span style="color:{d(hi["tx-2"])}">Secondary text.</span> '
+            f'<span style="color:{d(hi["tx-3"])}">faint.</span></p>'
             f'<p style="margin:6px 0;font-size:13px">'
-            f'<b style="color:{d(pr["emphasis-1"])}">強調青</b> / '
-            f'<b style="color:{d(pr["emphasis-2"])}">強調赤</b> / '
-            f'<span style="color:{d(pr["sub-1"])}">緑</span> / '
-            f'<b style="color:{d(pr["sub-3"])}">黄 (太字限定)</b></p>'
+            f'<b style="color:{d(pr["emphasis-1"])}">Blue emphasis</b> / '
+            f'<b style="color:{d(pr["emphasis-2"])}">Red emphasis</b> / '
+            f'<span style="color:{d(pr["sub-1"])}">Green</span> / '
+            f'<b style="color:{d(pr["sub-3"])}">Yellow (bold only)</b></p>'
             f'<div style="background:{d(pr["note-fill"])};color:{d(pr["note-text"])};'
-            f'border-radius:5px;padding:6px 10px;font-size:12px;margin:6px 0">red-100 の注意ボックス</div>'
+            f'border-radius:5px;padding:6px 10px;font-size:12px;margin:6px 0">red-100 warning box</div>'
             f'<div style="background:{d(pr["info-fill"])};color:{d(pr["info-text"])};'
-            f'border-radius:5px;padding:6px 10px;font-size:12px">blue-100 の補足ボックス</div>'
+            f'border-radius:5px;padding:6px 10px;font-size:12px">blue-100 info box</div>'
             f'<div style="display:flex;gap:4px;margin-top:8px">'
             + ''.join(f'<div style="flex:1;height:22px;border-radius:3px;'
                       f'background:{d(pal["accents"][n][50]["hex"])}"></div>'
                       for n in ('blue', 'red', 'yellow', 'orange', 'green'))
-            + '</div><div class="small" style="margin-top:2px">50 帯の塗り (枠線なし)</div>'
+            + '</div><div class="small" style="margin-top:2px">50-step fills (no border)</div>'
             f'</div>')
     return ''.join(h)
 
@@ -982,14 +1005,14 @@ if __name__ == '__main__':
     with open(os.path.join(OUT, 'tokens.css'), 'w') as f:
         f.write(gen_tokens_css(pal))
 
-    # コンソールに要約
+    # Console output is intentionally compact so regeneration can be checked by eye.
     print('generated: palette.json, out/{swatches,contrast,cvd,roles,degrade,paper}.html, '
           'out/tokens.css')
     d = pal['bg']
-    print(f"\n-- bg (確定) --\n  {d['bg']} (bg2 {d['bg2']}, "
+    print(f"\n-- bg (final) --\n  {d['bg']} (bg2 {d['bg2']}, "
           f"dE_white {d['dE_white']}, dE_paper {d['dE_paper']})")
     p = pal['paper']
-    print(f"\n-- paper bg (確定 P2) --\n  {p['bg']} (bg2 {p['bg2']}, "
+    print(f"\n-- paper bg (final P2) --\n  {p['bg']} (bg2 {p['bg2']}, "
           f"dE_bg {p['dE_bg']}, dE_white {p['dE_white']})")
     for role in ('tx', 'tx-2', 'tx-3'):
         hx = pal['roles']['paper'][role]['hex']
@@ -1000,7 +1023,7 @@ if __name__ == '__main__':
         hx = pal['accents'][n][600]['hex']
         print(f"  {n:8s} {hx}  {wcag(hx, bgh):5.2f}:1  Lc {apca_lc(hx, bgh):+6.1f}")
 
-    print('\n-- CVD: 最接近ペア上位 3 (ΔEok, step 400 / 600) --')
+    print('\n-- CVD: closest 3 pairs (ΔEok, step 400 / 600) --')
     for step in (400, 600):
         for kind in ('protan', 'deutan', 'tritan'):
             sims = {n: cvd_hex(pal['accents'][n][step]['hex'], kind) for n in ACCENTS}

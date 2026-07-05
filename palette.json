@@ -1,7 +1,7 @@
 {
  "meta": {
   "source": "build.py",
-  "note": "Phase 1 決定済み (bg=案A, base=neutral)。Phase 3 ロールはドラフト (photo-surface 等は仮決め)"
+  "note": "Phase 1 finalized bg=option A and base=neutral. Phase 3 roles remain draft where marked provisional."
  },
  "special": {
   "white": "#FFFFFF",

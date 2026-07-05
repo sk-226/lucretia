@@ -223,7 +223,7 @@
       }
     },
     {
-      "name": "Markup bold (\\textbf 等)",
+      "name": "Markup bold (\\textbf, strong)",
       "scope": [
         "markup.bold",
         "strong"
@@ -233,7 +233,7 @@
       }
     },
     {
-      "name": "Markup italic (\\textit, \\emph 等)",
+      "name": "Markup italic (\\textit, \\emph, emphasis)",
       "scope": [
         "markup.italic",
         "emphasis"
@@ -243,7 +243,7 @@
       }
     },
     {
-      "name": "Markup bold+italic (入れ子)",
+      "name": "Markup bold+italic (nested)",
       "scope": [
         "markup.bold markup.italic",
         "markup.italic markup.bold"
@@ -253,7 +253,7 @@
       }
     },
     {
-      "name": "Markup underline (\\underline 等)",
+      "name": "Markup underline (\\underline)",
       "scope": [
         "markup.underline"
       ],
@@ -281,7 +281,7 @@
       }
     },
     {
-      "name": "Reference / citation key (\\ref, \\cite 等, Tier 3)",
+      "name": "Reference / citation key (\\ref, \\cite, Tier 3)",
       "scope": [
         "constant.other.reference"
       ],
