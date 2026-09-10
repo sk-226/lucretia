@@ -1,10 +1,6 @@
-# 検証用写真 (Phase 4, plan.md §6.4)
+# Review photos
 
-out/roles.html のギャラリーモックがここを参照する。以下の名前で保存すること:
+The gallery review pages use these images to compare overlays on bright, dark,
+and colorful regions. They are excluded from the preview site and app packages.
 
-- photo-1.jpg — 明るい昼景 (例: ビーチの街並み)
-- photo-2.jpg — 暗部主体 (例: B&W の階段)
-- photo-3.jpg — 色数の多い街 (例: 浅草の商店街)
-
-無い場合はモックはグラデーションにフォールバックする。
-写真は git 管理外にしたければ .gitignore に追加してよい (モックの動作には影響しない)。
+Verify reuse permissions before redistributing these images.

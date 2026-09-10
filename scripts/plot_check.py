@@ -2,13 +2,13 @@
 
 Generates marker-less line plots with the Lucretia chart colors
 (roles.presentation.chart-1..7 in palette.json) on three backgrounds:
-  1. lucretia_light : bg #FDFCF7, horizontal grid only
-  2. lucretia_paper : paper bg #F8F5EB, horizontal grid only
+  1. lucretia_light : bg #FDFCF7, grid
+  2. lucretia_paper : paper bg #F8F5EB, grid
   3. matlab_default : white bg, box on, MATLAB-style grid
 
 Unlike build.py this script needs numpy + matplotlib, so it is run manually;
-the committed PNGs under assets/plots/ are referenced by out/overview.html.
-Rerun it after changing the chart-1..7 roles; colors are resolved from build.py.
+the committed PNGs under assets/plots/ are referenced by review/overview.html.
+Rerun it after changing the chart-1..7 roles; colors are resolved from scripts/palette.py.
 """
 
 from pathlib import Path
@@ -16,7 +16,7 @@ from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 
-from build import build_palette
+from palette import build_palette
 
 OUT = Path(__file__).resolve().parent.parent / "assets" / "plots"
 
@@ -105,13 +105,13 @@ figs = {
         bg=role("light", "bg"), grid=role("light", "ui-2"),
         spine=role("light", "ui-3"),
         tx=role("light_high", "tx"), tx2=role("light_quiet", "tx-2"),
-        title="Lucretia chart palette — light bg"),
+        title="Lucretia chart palette - light bg"),
     "lucretia_paper": lucretia_fig(
         bg=role("paper", "bg"), grid=role("paper", "ui-2"),
         spine=role("paper", "ui-3"),
         tx=role("paper", "tx"), tx2=role("paper", "tx-2"),
-        title="Lucretia chart palette — paper bg"),
-    "matlab_default": matlab_fig("Lucretia chart palette — MATLAB default axes"),
+        title="Lucretia chart palette - paper bg"),
+    "matlab_default": matlab_fig("Lucretia chart palette - MATLAB default axes"),
 }
 
 OUT.mkdir(parents=True, exist_ok=True)

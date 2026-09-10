@@ -1,4 +1,4 @@
-// Lucretia theme check — check.ts
+// Lucretia theme check - check.ts
 //
 // Checks:
 //   1. Variables, parameters, and properties stay neutral via semantic tokens.

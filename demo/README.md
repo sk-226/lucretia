@@ -1,55 +1,77 @@
-# テーマ動作確認手順
+# Native app checks
 
-`check.tex` / `check.ts` / `check.md` を開くとエディタ内の色は一通り確認できる
-(各ファイル冒頭のコメント参照)。以下はエディタ UI 側のチェック。
+Use a test vault or test editor profile so unrelated settings are easy to separate.
 
-## 準備
+## VS Code and Cursor
 
-1. ウィンドウ再読み込み: `Cmd+Shift+P` → `Developer: Reload Window`
-2. テーマ切替: `Cmd+K Cmd+T` → Lucretia Paper / Light / Dark
-3. VSCode と Cursor の両方で同じ手順を繰り返す
+Install `dist/vscode/lucretia-theme.vsix` through **Extensions: Install from VSIX**.
+Confirm the extension is `sugu.lucretia-theme`, the version in `VERSION`, with all three
+appearances. Repeat in each editor. Open the files in this folder and switch
+among Light, Dark, and Paper. `check.ts` includes intentional errors.
+`check.tex` needs a LaTeX grammar such as LaTeX Workshop to inspect its tokens.
 
-## UI チェックリスト
+Check the command palette, file picker, tabs, sidebar, search, selection,
+completion, hover, diagnostics, scrollbar, and integrated terminal. Compare
+bracket pairs with and without your current font's ligatures. A font's glyph
+shaping can affect bracket coloring; do not change the theme based on one font
+without checking another. Use a temporary Git edit to inspect added / removed
+lines, gutter marks, and diff colors.
 
-| 項目 | 手順 | 期待される見え方 |
-|---|---|---|
-| タブ | check.* を 3 つ開く | アクティブタブ上端に blue のボーダー、非アクティブは bg-2 |
-| コマンドパレット | `Cmd+P` / `Cmd+Shift+P` | パネル = bg-2、フォーカス行 = 選択色 (blue-150/850) |
-| Explorer の Git 色 | この demo/ が未コミットの間 | ファイル名が緑 + U (untracked) |
-| Git gutter | demo/ をコミット → check.ts を編集 | 追加=緑バー、変更=青バー、削除=赤三角 |
-| diff | Source Control で変更ファイルを開く | 追加行=緑の透過、削除行=赤の透過 |
-| 検索ウィジェット | `Cmd+F` | ウィジェット = bg-2 + ui-3 ボーダー、入力欄はテーマ色 |
-| サジェスト | check.ts で `model.` と打つ | 補完リストの選択行 = 選択色 |
-| ホバー | check.ts の関数名にマウスオーバー | bg-2 + ui-3 ボーダー |
-| overview ruler | check.ts を開く | 右端にエラー(赤)・検索(黄)のマーク |
-| スクロールバー | 長いファイルでスクロール | 半透明グレーのスライダー |
-| ターミナル ANSI | 下のコマンドを実行 | 16 色スウォッチ |
+## Ghostty
 
-ターミナル ANSI 確認 (zsh):
+Install all three files as described in the main README. Test an explicit
+Paper theme, then Light, then Dark. Reload after changing the configuration.
+Test the optional light / dark configuration by changing the system appearance.
+Check cursor text, selected text, normal colors, and bright colors.
+
+In zsh, print the sixteen background and foreground colors:
 
 ```sh
 for i in {0..15}; do print -nP "%K{$i}  %k"; done; echo
 for i in {0..15}; do print -nP "%F{$i}A%f "; done; echo
 ```
 
-## 注意
+Compare the slots with the VS Code terminal. Existing Ghostty color overrides
+must be removed from the test config before judging the theme.
 
-- 太字・斜体はエディタフォントに bold / italic フェイスがあることが前提
-- `check.tex` のシンタックスは LaTeX Workshop 拡張が必要
-- **`editor.fontLigatures: true` は括弧色付けを壊す**: リガチャフォント
-  (JetBrains Mono, UDEV Gothic NFLG 等) が連続括弧を合字化すると
-  1 グリフ = 1 色になり「2 文字ずつ同色」に見える。対策は
-  `"editor.fontLigatures": false`、または非リガチャ版フォント
-  (UDEV Gothic **NF** など) を使う
+## Obsidian
 
-## テーマ更新の反映方法 (エディタ別)
+First test the standalone theme without Minimal or Style Settings. In
+**Settings > Appearance > Base color scheme**, select **Light** and expect Paper,
+then select **Dark** and expect Dark. Return the setting to **Light** before
+testing Paper / Light switching and persistence. Open `check.md` in reading view
+and Live Preview. Check headings, links, inline code, fenced code, highlights,
+quotes, callouts, tables, checkboxes, search, the command palette, and the sidebar.
 
-- **VS Code / Cursor 共通**: リポジトリ直下で次を実行する:
-  ```sh
-  ./scripts/install_editor_theme.sh
-  ```
-  同じ VSIX を両方へ入れる。Cursor だけ dist へのシンボリックリンクにすると、
-  VS Code とは更新モデルがずれ、Cursor の `.obsolete` キャッシュに残った version と
-  衝突してテーマが一覧から消えることがある。
-- 更新後は両方のエディタを再起動 (Cmd+Q) する。単なるウィンドウ再読み込みでは、
-  拡張一覧キャッシュが古いまま残る場合がある。
+Enable Style Settings. The command palette must contain exactly one
+**Style Settings: Toggle Lucretia Paper / Light** command. Run it to get Light,
+then again to get Paper. Quit and restart Obsidian after choosing Light and confirm
+the choice survives. Change the base color scheme to Dark and back to Light;
+expect the previous light appearance.
+While in Dark, run the toggle and confirm the display stays Dark, then return
+to light mode and check the changed choice. Check a detached window as well;
+class propagation into secondary windows is controlled by Obsidian and Style
+Settings and needs native verification.
+
+Check **Adapt to system** separately. On restart, expect Obsidian to follow the OS.
+Its light / dark command and Minimal Theme Settings' equivalent only change the
+current session in this mode. Return the base color scheme to **Light** and confirm
+the saved Lucretia Paper / Light choice remains available.
+
+Repeat with Minimal and only `lucretia-minimal.css` enabled. Disable the standalone
+theme and any 0.2.x `lucretia-paper.css` snippet. Use Minimal's default schemes and
+clear only prior color overrides. Layout and typography should remain Minimal's.
+There must be no mixture of Paper and Light after a toggle. Test one normal
+Minimal preset to identify any remaining override conflicts.
+
+Repeat on the mobile device you use. Confirm the active config folder contains
+the theme / snippet and Style Settings. Open the command palette through the
+mobile UI and repeat the toggle, restart, and light / dark checks. Check the
+mobile sidebar and dialogs. Browser viewport tests alone do not verify mobile
+Obsidian behavior.
+
+## Updating
+
+Install the new VSIX over the prior extension. Replace the Ghostty theme files
+and the Obsidian theme folder or snippet without replacing settings files.
+Confirm the Obsidian light-appearance choice remains saved.

@@ -1,4 +1,4 @@
-"""Color conversion and evaluation helpers for plan.md §5.
+"""Color conversion and evaluation helpers for DESIGN.md.
 
 This module intentionally has no third-party dependencies so palette generation
 stays easy to run in a fresh checkout. Implemented metrics:
@@ -8,7 +8,7 @@ stays easy to run in a fresh checkout. Implemented metrics:
 - APCA-W3 0.0.98G-4g-style Lc value
 - sRGB gamut checks and chroma clamping
 
-Run `python3 color.py` for the local self-test.
+Run `python3 scripts/color.py` from the repository root for the self-test.
 """
 import math
 
@@ -171,7 +171,7 @@ def cvd_hex(h, kind):
 
 
 # ---------- Self-test ----------
-if __name__ == '__main__':
+def self_test():
     ok = True
 
     # OKLCH roundtrip.
@@ -200,7 +200,9 @@ if __name__ == '__main__':
 
     # Chroma clamping must pull saturated colors back into gamut.
     c = clamp_chroma(0.53, 0.4, 145)
-    assert oklch_in_gamut(0.53, c, 145)
+    if not oklch_in_gamut(0.53, c, 145):
+        print('[FAIL] clamped chroma remains outside sRGB')
+        ok = False
 
     # CVD simulation should preserve neutrals and reduce red/green distance.
     for kind in ('protan', 'deutan', 'tritan'):
@@ -218,3 +220,9 @@ if __name__ == '__main__':
             print(f'[ok] CVD {kind}: red-600/green-600 dE {d_orig:.3f} -> {d_sim:.3f}')
 
     print('ALL TESTS PASSED' if ok else 'TESTS FAILED')
+
+    return ok
+
+
+if __name__ == '__main__':
+    raise SystemExit(0 if self_test() else 1)

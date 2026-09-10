@@ -1,9 +1,37 @@
-# 見出しは太字 (markup.heading)
+# Notes on color
 
-**太字** と *斜体* と ***太字イタリック*** と ~~取り消し線~~ を確認。
+**Bold**, *italic*, ***bold italic***, and ~~strikethrough~~ text should remain readable.
 
-[リンクテキスト](https://example.com) — テキストは string 色、URL は下線。
+[An external link](https://example.com) and [[An internal link]] test link colors.
 
-> 引用は tx-2 の斜体で一段沈む (markup.quote)
+> Quotes use a secondary text color and a visible border.
 
-`inline code` と、Cmd+F 用の検索語: 確認。もう一つの確認。
+Use `inline code` for a short expression. Search for "color" to inspect search matches.
+The word color appears again here. A ==highlighted passage== needs dark text in
+both light and dark modes.
+
+```python
+# A small code sample.
+def square(value):
+    return value ** 2
+
+label = "result"
+```
+
+> [!note] A callout
+> Check the title, icon, background, and body text.
+
+| Appearance | Purpose |
+| --- | --- |
+| Light | A light page |
+| Dark | A dark page |
+| Paper | A warmer light page |
+
+- [ ] A task to review
+- [x] A completed task
+
+The equation $Ax=b$ and the display below should use readable neutral text.
+
+$$
+r_k = b - Ax_k.
+$$

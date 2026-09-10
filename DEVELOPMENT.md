@@ -1,124 +1,127 @@
-# Lucretia 開発メモ
+# Development
 
-このファイルは開発・検証用の作業メモです。
-README は初めて見る人に「何のプロジェクトか」を伝える場所として短く保つため、
-進捗、再生成手順、検証規約、作業時の注意はここに置きます。
-
-## 基本方針
-
-設計方針・要求仕様・評価基準はすべて `plan.md` にある。
-作業を始める前に必ず `plan.md` を読み、決定事項は `plan.md` §9 に集約する。
-
-## 現状（Phase 1–2 完了、Phase 3 ドラフト生成済み）
-
-```
-plan.md               設計計画（単一の正）。決定事項は §9 に集約
-scripts/color.py      色変換・評価ライブラリ（依存なし）
-                      sRGB<->OKLCH / ΔEok / WCAG 2.x / APCA-W3 / CVD (Machado 2009)
-                      APCA は公式リファレンス 4 値と一致確認済み（python3 scripts/color.py）
-scripts/build.py      パレット生成 + HTML 出力。設計パラメータ・ROLES は冒頭の定数に集約
-palette.json          生成結果 + ロールマッピング（単一ソース。手編集せず build.py を直す）
-out/swatches.html     確定 bg のプレビュー / base スケール / アクセント一覧 / コード階層デモ
-out/contrast.html     コントラスト行列（WCAG + APCA）+ 淡色帯 50–200 の塗り/文字検証
-out/cvd.html          P/D/T 型 (Machado 2009) シミュレーション + ペア ΔEok 行列
-out/roles.html        ロール表 + 用途モック（スライド / Markdown / コードエディタ / ギャラリー実写）
-out/overview.html     パレット一覧ツアー（palette / syntax / base / accents / extended / mappings）
-                      + light/dark/paper 比較（エディタ / Markdown / plot / ギャラリー / スライド）
-out/degrade.html      投影劣化シミュレーション（彩度低下 / ガンマ / 黒浮き）
-out/paper.html        lucretia paper（長文読書プロファイル §6.5）: 確定 bg プレビュー + 読書モック
-out/tokens.css        CSS variables（--lu-* パレット + data-theme/data-contrast ロール）
-scripts/build_dist.py 配布物生成（palette.json → dist/）
-scripts/plot_check.py chart-1..7 の matplotlib 検証プロット（要 numpy/matplotlib、手動実行）
-dist/vscode/          VS Code テーマ拡張（Light / Dark / Paper + ターミナル ANSI 16）
-dist/obsidian/        Obsidian CSS スニペット（読書用 lucretia-paper.css）
-assets/photos/        ギャラリーモック用の実写 3 枚（保存済み）
-assets/plots/         plot_check.py の生成 PNG（overview.html が参照。chart ロール変更時に再生成）
-```
-
-## 再生成
+Python 3.10 or later is sufficient for the build and core checks. No packages need
+to be installed. Run commands from the repository root.
 
 ```sh
-python3 scripts/color.py
 python3 scripts/build.py
-python3 scripts/build_dist.py
+python3 scripts/check.py
 ```
 
-パレットの正は `scripts/build.py` のパラメータ。
-`palette.json`、`out/`、`dist/` は生成物なので、色の手打ち修正はしない。
+The build creates the JSON, CSS, VSIX, Obsidian ZIP, Ghostty files, preview, and
+review pages. It does not install anything or change app settings. `VERSION`
+sets the version in both app packages. Increase it when shipping a new version.
+The extension ID is `sugu.lucretia-theme`.
 
-## エディタテーマの試用
+## Edit and output locations
 
-VS Code / Cursor テーマの試用:
+| Location | Purpose |
+| --- | --- |
+| `scripts/palette.py` | Edit palette parameters and role assignments here. |
+| `scripts/color.py` | Color conversion and numerical checks. |
+| `scripts/export.py` | App mappings and public CSS variables. |
+| `scripts/package.py` | Fixed ZIP / VSIX packaging for these data-only themes. |
+| `scripts/preview.html` | The preview's HTML template. |
+| `docs/style.css`, `docs/preview.js` | The preview's layout and interactions. |
+| `docs/fonts/` | Web fonts and their source attribution and licenses. |
+| `scripts/review.py` | Detailed color review pages. |
+| `dist/` | Generated, ready-to-use files. Commit them with their sources. |
+| `docs/index.html` | Generated preview, with palette values embedded. |
+| `review/` | Generated color review pages. Not part of the public preview site. |
+| `tests/` | Color, format, packaging, and failure-path checks. |
+
+Do not edit `dist/`, `review/`, or `docs/index.html` by hand. The build owns these
+locations and removes unexpected files there, including old VSIX copies.
+
+Every output uses a freshly generated in-memory palette from `scripts/palette.py`.
+
+The VSIX contains only package metadata, the three theme JSON files, a README,
+and the third-party notice. The packager uses the VSIX ZIP/XML format.
+ZIP timestamps and permissions are fixed for reproducible builds.
+
+## Checks
 
 ```sh
-./scripts/install_editor_theme.sh
+python3 scripts/check.py
 ```
 
-両方のエディタを再起動し、テーマ選択で "Lucretia Light" / "Lucretia Dark" /
-"Lucretia Paper"（長文読書用）を選ぶ。
+This runs the color self-test, the standard-library test suite, and the generated
+file check. A failure returns a nonzero exit code. The checker does not update
+or repair generated files.
 
-このスクリプトは同じ VSIX を VS Code と Cursor の両方に入れる。
-片方だけ symlink にすると、Cursor の `.obsolete` キャッシュと拡張バージョンが衝突して
-テーマが一覧から消えることがあるため。
+```sh
+python3 scripts/build.py --check
+```
 
-Obsidian: `dist/obsidian/lucretia-paper.css` を vault の `.obsidian/snippets/` にコピーして有効化。
-Obsidian 用は当面 lucretia paper のみを生成する。Minimal theme の配色トークンを上書きし、
-レイアウト・タイポグラフィ・plugin 互換性は Minimal 側に任せる。
-mobile が別 config/profile を使う vault では、その profile の snippets にも同じ CSS を入れ、
-appearance 側で Minimal theme と `lucretia-paper` snippet を有効化する。
+This narrower check reports missing, stale, or extra generated files. Tests also
+inspect the archives' metadata, theme paths, colors, and included notices.
+`tests/baseline.json` records hashes of the reference palette and VS Code themes
+to detect unintended color changes. Update the baseline after reviewing an
+intentional color change.
 
-エディタ UI の確認手順は `demo/README.md` を参照する。
+### Browser checks
 
-## 生成モデルの検証状況
+The optional browser test needs Playwright and a Chromium installation. These are
+test tools, not dependencies of the site, build, or installed themes.
 
-Flexoki 実測から導いたパラメータ（hue / Cmax / L 補正）で生成した 600 系は
-原典 Flexoki とほぼ一致（例: red #AF3028 vs #AF3029）。
-生成モデル自体は Flexoki を再現できており、ここからパラメータを動かして
-自分のテーマへ寄せていく段階。
+```sh
+python3 -m pip install playwright
+python3 -m playwright install chromium
+python3 tests/browser_check.py
+```
 
-## 次のタスク（plan.md §8）
+An existing browser can be selected with `--chromium /path/to/chromium`.
+Use `--screenshots /path/to/output` to save screenshots. The test loads the generated
+HTML and its CSS / JavaScript directly into Chromium, without URL navigation or a
+server. It checks appearance buttons, keyboard operation, narrow layouts, and
+Obsidian CSS under controlled body classes. Clipboard success uses a stub; denial
+and absence exercise actual text selection. It does not verify OS clipboard access,
+local-file navigation, native apps, or Style Settings' command registration and
+persistence. Follow `demo/README.md` for those app checks.
 
-**~~Phase 1 — bg / base の確定~~ 完了（2026-07）**:
-bg = #FDFCF7、base = neutral（plan.md §9-7, 8）
+The contrast, CVD, reading, and gallery checks are in `review/`. Their
+images live in `assets/`. To regenerate the optional chart images, install NumPy
+and Matplotlib and run `python3 scripts/plot_check.py`. This is not part of the
+normal build. See `assets/photos/README.md` for the review images.
 
-**~~Phase 2 — アクセント検証~~ 完了（2026-07）**:
-検証結果と規約は plan.md §9-9 に集約
-（yellow 太字限定 / orange–green 隣接禁止 / 淡色帯 両用途合格）。
-CVD・淡色帯の詳細は `out/cvd.html`, `out/contrast.html`。
+## Manual updates
 
-**Phase 3 — ロールマッピング: ドラフト生成済み、要レビュー**
+Change the sources, increase `VERSION` when needed, build, run checks, and review
+the diff. Commit the sources and generated files together. Users download
+and replace files from GitHub.
 
-- `build.py` の `ROLES` 定数 → `palette.json` roles / `out/roles.html` / `out/tokens.css`
-- APCA 実測に基づく確定: ダーク bg = black、シンタックスはライト 600 帯・ダーク 300 帯中心、
-  keyword=magenta / number=purple（plan.md §9-10, 11）
-- chart-1〜7（MATLAB 風 7 色、CVD 最適順。plan.md §9-12）と
-  ハイライター hl-*（黒文字専用、plan.md §9-13）を追加
-- photo-surface 確定: ライト = bg（§9-14）/ ダーク = base-950（§9-15、ダークギャラリー採用）
-- `out/roles.html` のモック 4 種（スライド / Markdown / コード / ギャラリー）を目視確認
+## Publish the preview
 
-**lucretia paper（長文読書プロファイル、2026-07 追加）:
-bg = P2 #F8F5EB 確定（plan.md §9-16）**
+The `docs/` folder is a self-contained static site. Opening `docs/index.html`
+locally does not require a server. There are no external scripts, fonts, or
+runtime requests for the palette.
 
-- 設計は plan.md §6.5。暖色 pbase + 書籍インク帯 tx（pbase-900、12.5:1 / Lc +94）
-- VS Code "Lucretia Paper" / Obsidian `lucretia-paper.css` を数日実運用して
-  インク帯の適否を確認（plan.md §9 未決-2）
+In the GitHub repository, open **Settings > Pages**, choose
+**Deploy from a branch**, and select **main /docs**. This uses GitHub's built-in
+branch publishing. GitHub shows the published URL there.
 
-**Phase 4 — 実地検証（要ユーザー）**
+## Migration from 0.2.x
 
-- ~~検証写真の保存~~ 済み → `out/roles.html` のギャラリーモックが実写表示
-- ~~VS Code テーマ試作~~ `dist/vscode/` に生成済み → 実際にインストールして数日使う
-- `out/degrade.html` で劣化スクリーニング → 実プロジェクタで 1 回以上確認（plan.md §5.3–5.4）
-- サンプルスライドで実プレゼン、Markdown 実運用（`dist/obsidian/` スニペット）
+When updating a copy extracted from a ZIP, remove the root `palette.json`, `out/`,
+`assets/previews/`, `plan.md`, `repo-review-plan.md`, `scripts/build_dist.py`, and
+`scripts/install_editor_theme.sh`. Version 0.3.0 replaces these files and folders.
+Building replaces the old contents of `dist/`.
 
-**Phase 5**:
-パッケージ化の残り（仕様ドキュメント、vsix 化、プレゼンテンプレの色定義）。
-詳細は plan.md §8。
+Colors now live in `dist/palette/`. Generic CSS roles use `--lu-` names and
+`data-lu-theme="light|dark|paper"`, not `--bg`, `--tx`, or `data-theme`.
+Disable the 0.2.x `lucretia-paper.css` snippet before enabling the Lucretia theme
+or `lucretia-minimal.css`.
+The extension ID and appearance names have not changed.
 
-## 規約
+## References
 
-- 全色 sRGB 内・OKLCH で管理（plan.md §5.4）
-- パレットの正は `build.py` のパラメータ。hex の手打ち修正はしない（`dist/` も手編集しない）
-- 変更のたびに `python3 scripts/color.py`（テスト）→ `python3 scripts/build.py` →
-  `python3 scripts/build_dist.py` を実行
-- Flexoki 由来・参考の説明を公開物に残す場合は、`THIRD_PARTY_NOTICES.md` の帰属と
-  MIT License 通知が同梱または参照されることを確認する
+- [Ghostty theme configuration](https://ghostty.org/docs/config/reference#theme)
+- [VS Code extension packaging](https://code.visualstudio.com/api/working-with-extensions/publishing-extension)
+- [Obsidian theme development](https://docs.obsidian.md/Themes/App+themes/Build+a+theme)
+- [Style Settings class toggles](https://github.com/community-archive/obsidian-style-settings#class-toggle)
+
+Style Settings registers `addCommand` for a `class-toggle` and applies that
+setting's ID as a body class. Lucretia uses a single false-by-default
+`lucretia-light` setting in a `lucretia` section. The theme and Minimal overlay
+share those IDs, so switching between the two installation methods does not
+require two sets of color choices. Do not enable both methods at once.

@@ -1,27 +1,17 @@
-% Lucretia theme check — check.tex (requires the LaTeX Workshop extension)
-%
-% Checks:
-%   1. Comments render as quiet italic gray (Tier 4).
-%   2. Cmd+F on "quote" shows the current match with hl-yellow and a border.
-%   3. Placing the cursor on a bracket shows bracketMatch.
-%   4. \textbf, \textit, \emph, and \underline render with real font styling.
+% Lucretia theme check. Inspect this file with a LaTeX grammar enabled.
 \documentclass{article}
 \begin{document}
+\section{A heading}
 
-\section{見出しは太字になる}
+{{{{{{}}}}}} % Six nested bracket pairs.
 
-{{{{{{}}}}}} // Six bracket levels open blue -> orange -> purple -> yellow -> magenta -> cyan.
+Plain text, \textbf{bold}, \textit{italic}, \emph{emphasis},
+\underline{underlined text}, and \textbf{\textit{bold italic}}.
 
-本文は tx のまま彩色されない。\textbf{太字}、\textit{斜体}、\emph{強調}、
-\underline{下線}、\textbf{\textit{太字イタリック}} の入れ子を確認。
-
-図~\ref{fig:model} と文献~\cite{lucretia2026} のキーは blue。ここでも確認。
-
-数式 $E = mc^2$ と入れ子括弧 ${[({[(x)]})]}$ で括弧 6 色サイクルを確認。
-閉じ忘れの括弧 ) は unexpectedBracket の赤になる。
+Check the reference \ref{fig:model} and citation \cite{lucretia2026}.
+The equation $E = mc^2$ and nested brackets ${[({[(x)]})]}$ test math tokens.
 
 \begin{quote}
-  quote 環境の中身。環境名 quote の色も確認。
+  A quoted passage. Search for "quote" to inspect search highlighting.
 \end{quote}
-
 \end{document}
