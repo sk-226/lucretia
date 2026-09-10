@@ -12,9 +12,10 @@ A color theme for code and notes, in Light, Dark, and Paper.
 
 ## Preview
 
-Download the repository and open `docs/index.html`. Choose Light, Dark, or Paper,
-and click a color to copy its code. No build or server is needed.
-The page contains browser previews, not app screenshots.
+[Open the preview](https://sk-226.github.io/lucretia/) to compare Light, Dark, and
+Paper and copy color codes.
+
+You can also download the repository and open `docs/index.html` locally.
 
 ## Install
 
