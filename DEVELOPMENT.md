@@ -8,8 +8,8 @@ python3 scripts/build.py
 python3 scripts/check.py
 ```
 
-The build creates the JSON, CSS, VSIX, Obsidian ZIP, Ghostty files, preview, and
-review pages. It does not install anything or change app settings. `VERSION`
+The build creates the JSON, CSS, VSIX, Obsidian ZIP, Ghostty files, Vim / Neovim
+colorschemes and ZIP, preview, and review pages. It does not install anything or change app settings. `VERSION`
 sets the version in both app packages. Increase it when shipping a new version.
 The extension ID is `sugu.lucretia-theme`.
 
@@ -20,6 +20,7 @@ The extension ID is `sugu.lucretia-theme`.
 | `scripts/palette.py` | Edit palette parameters and role assignments here. |
 | `scripts/color.py` | Color conversion and numerical checks. |
 | `scripts/export.py` | App mappings and public CSS variables. |
+| `scripts/vim_theme.py`, `scripts/vim.README.md` | Shared Vim / Neovim mappings and installation text. |
 | `scripts/package.py` | Fixed ZIP / VSIX packaging for these data-only themes. |
 | `scripts/preview.html` | The preview's HTML template. |
 | `docs/style.css`, `docs/preview.js` | The preview's layout and interactions. |
@@ -58,6 +59,26 @@ inspect the archives' metadata, theme paths, colors, and included notices.
 `tests/baseline.json` records hashes of the reference palette and VS Code themes
 to detect unintended color changes. Update the baseline after reviewing an
 intentional color change.
+
+### Vim and Neovim checks
+
+The core suite checks the generated schemes, links, palette mappings, ANSI colors,
+and ZIP contents. When `vim` or `nvim` is on `PATH`, it also starts that editor
+with no user config. Each editor tests all three appearances, all nine ordered
+appearance transitions, explicit highlight colors, and actual Python syntax tokens
+with syntax enabled both before and after theme loading. Missing editors are
+reported as skipped tests; a successful core check is not proof that both editors
+were run. No editor is installed by the tests.
+
+```sh
+python3 -m unittest discover -s tests -p 'test_vim.py' -v
+```
+
+The installed themes are static Vimscript. Neovim-only groups are inside
+`has('nvim')`; no Lua loader, plugin hooks, color calculations, or automatic
+updates run in the editor. Terminal palettes apply to new terminal buffers.
+The schemes use RGB colors only; they do not attempt a 256-color fallback.
+Native visual checks are described in [demo/README.md](demo/README.md).
 
 ### Browser checks
 
@@ -118,6 +139,10 @@ The extension ID and appearance names have not changed.
 - [Ghostty theme configuration](https://ghostty.org/docs/config/reference#theme)
 - [VS Code extension packaging](https://code.visualstudio.com/api/working-with-extensions/publishing-extension)
 - [Obsidian theme development](https://docs.obsidian.md/Themes/App+themes/Build+a+theme)
+- [Vim colorscheme loading](https://vimhelp.org/syntax.txt.html#%3Acolorscheme)
+- [Neovim Tree-sitter captures](https://neovim.io/doc/user/treesitter/#treesitter-highlight-groups)
+- [Neovim LSP semantic highlights](https://neovim.io/doc/user/lsp/#lsp-semantic-highlight)
+- [Neovim terminal colors](https://neovim.io/doc/user/terminal/#terminal-config)
 - [Style Settings class toggles](https://github.com/community-archive/obsidian-style-settings#class-toggle)
 
 Style Settings registers `addCommand` for a `class-toggle` and applies that

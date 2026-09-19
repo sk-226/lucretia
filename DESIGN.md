@@ -35,7 +35,7 @@ except for strings at green-400. Paper substitutes its warm neutrals for the
 neutral syntax colors. The JSON distinguishes syntax roles from UI text roles;
 they are not interchangeable.
 
-The ANSI mapping is shared by VS Code and Ghostty. Light and Paper use normal
+The ANSI mapping is shared by VS Code, Ghostty, Vim, and Neovim. Light and Paper use normal
 accents at 600 and bright accents at 400. Dark uses 300 and 200. Paper changes
 the neutral slots, not the chromatic ANSI hues. Bright terminal colors are kept
 for terminal compatibility; they are not general-purpose body text colors.

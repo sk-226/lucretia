@@ -34,6 +34,33 @@ for i in {0..15}; do print -nP "%F{$i}A%f "; done; echo
 Compare the slots with the VS Code terminal. Existing Ghostty color overrides
 must be removed from the test config before judging the theme.
 
+## Vim and Neovim
+
+Copy the schemes as described in the main README. With a true-color terminal,
+open `check.jl`, `check.lua`, `check.md`, and `check.tex`. Start without plugins,
+then repeat with your normal setup. Switch among `lucretia-light`, `lucretia-dark`,
+and `lucretia-paper` with `:colorscheme`.
+
+Check line numbers, the cursor line, split separators, status lines, tabs, folds,
+Visual selection, `/` search, `:copen`, `:set spell`, and insert-mode completion
+with `CTRL-N`. Use `:diffsplit` on two copies of a file with a small edit to inspect
+added, deleted, and changed text. Selected and diff-highlighted code should retain
+its syntax foreground except where the editor explicitly requests another color.
+
+In Neovim, repeat with your usual Tree-sitter parsers and LSP server. Use `:Inspect`
+on a variable, function definition, function call, string, and comment. Variables,
+parameters, and properties should remain neutral. Check hover / signature windows,
+diagnostics, inlay hints, and reference highlights when those features are enabled.
+The theme colors these features but does not enable them.
+
+Open a new `:terminal` buffer for each appearance and print the ANSI colors using
+the Ghostty command above. Existing terminal buffers can retain their old palette;
+close and reopen them rather than restarting a running job automatically.
+
+Save the chosen colorscheme in your config, restart, and check the appearance.
+Automated editor tests do not verify your terminal's RGB output, installed
+language grammars, plugins, font rendering, or display.
+
 ## Obsidian
 
 First test the standalone theme without Minimal or Style Settings. In
@@ -74,4 +101,5 @@ Obsidian behavior.
 
 Install the new VSIX over the prior extension. Replace the Ghostty theme files
 and the Obsidian theme folder or snippet without replacing settings files.
+Replace the Vim / Neovim `.vim` files and reload the chosen colorscheme.
 Confirm the Obsidian light-appearance choice remains saved.

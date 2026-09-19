@@ -55,6 +55,37 @@ Reload Ghostty's configuration or restart it. Existing explicit color options in
 your config override the theme, so remove those only when you want Lucretia's colors.
 To update, replace the theme files and reload the configuration.
 
+### Vim and Neovim
+
+Download [lucretia-vim.zip](dist/vim/lucretia-vim.zip) and extract it. The three
+files in `lucretia-vim/colors/` work in both editors. No plugin manager is required.
+Use a true-color terminal with Vim 9+ or Neovim 0.10+, or a GUI with RGB support.
+
+**Vim:** copy the `.vim` files into `~/.vim/colors/` and add to `~/.vimrc`:
+
+```vim
+syntax enable
+set termguicolors
+colorscheme lucretia-paper
+```
+
+**Neovim:** copy the same files into `~/.config/nvim/colors/` and add to `init.lua`:
+
+```lua
+vim.opt.termguicolors = true
+vim.cmd.colorscheme("lucretia-paper")
+```
+
+Choose `lucretia-light`, `lucretia-dark`, or `lucretia-paper`. Change the colorscheme
+line in your config to keep the choice after restarting. The files also define
+Neovim's Tree-sitter and built-in LSP colors; they do not install or enable parsers
+or language servers. There is no 256-color approximation.
+
+To update, replace the theme files and run `:colorscheme lucretia-paper` again.
+See [the Vim / Neovim README](dist/vim/README.md) for other config paths and
+terminal-buffer behavior. Individual files: [Light](dist/vim/colors/lucretia-light.vim),
+[Dark](dist/vim/colors/lucretia-dark.vim), [Paper](dist/vim/colors/lucretia-paper.vim).
+
 ### Obsidian
 
 Choose one of the following methods. Do not enable both at once.

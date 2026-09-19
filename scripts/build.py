@@ -12,6 +12,7 @@ from export import (KINDS, theme_context, palette_colors, tokens_css,
                     vscode_theme, ghostty_theme, obsidian_css)
 from package import vscode_package, vsix_bytes, zip_bytes
 import review
+from vim_theme import vim_theme
 
 ROOT = Path(__file__).resolve().parent.parent
 NOTICE = 'THIRD_PARTY_NOTICES.md'
@@ -99,6 +100,9 @@ def render():
                          'author': 'sk-226', 'authorUrl': 'https://github.com/sk-226'}
     obsidian = {'Lucretia/manifest.json': json_bytes(obsidian_manifest),
                 'Lucretia/theme.css': obsidian_css(pal).encode(), f'Lucretia/{NOTICE}': notice}
+    vim = {'README.md': (ROOT / 'scripts/vim.README.md').read_bytes(), NOTICE: notice}
+    for kind in KINDS:
+        vim[f'colors/lucretia-{kind}.vim'] = vim_theme(pal, kind).encode()
     outputs = {
         'dist/palette/palette.json': json_bytes(pal),
         'dist/palette/tokens.css': css.encode(),
@@ -108,6 +112,9 @@ def render():
         'dist/obsidian/lucretia-minimal.css': obsidian_css(pal, minimal=True).encode(),
         'docs/index.html': preview_html(pal, css).encode(),
     }
+    outputs.update({f'dist/vim/{name}': data for name, data in vim.items()})
+    outputs['dist/vim/lucretia-vim.zip'] = zip_bytes(
+        {f'lucretia-vim/{name}': data for name, data in vim.items()})
     for kind in KINDS:
         outputs[f'dist/ghostty/Lucretia {kind.capitalize()}'] = ghostty_theme(pal, kind).encode()
     for folder in ('palette', 'vscode', 'obsidian', 'ghostty'):
