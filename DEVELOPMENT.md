@@ -117,9 +117,19 @@ The `docs/` folder is a self-contained static site. Opening `docs/index.html`
 locally does not require a server. There are no external scripts, fonts, or
 runtime requests for the palette.
 
-In the GitHub repository, open **Settings > Pages**, choose
-**Deploy from a branch**, and select **main /docs**. This uses GitHub's built-in
-branch publishing. GitHub shows the published URL there.
+In the GitHub repository, open **Settings > Pages > Build and deployment** and
+set **Source** to **GitHub Actions**. This is a one-time change from the previous
+**main /docs** branch publishing setup.
+
+The workflow in `.github/workflows/pages.yml` runs on pushes to `main` and can
+also be started from **Actions > Build and deploy Pages > Run workflow** on
+`main`. It runs `python3 scripts/build.py`, then `python3 scripts/check.py`, and
+publishes only `docs/` if both succeed. Runs on other branches do not deploy.
+
+The site is regenerated on GitHub, so a local build is not required just to
+publish preview changes. The workflow does not commit generated files back to
+the repository or update the downloadable `dist/` files on the branch. Continue
+to build and commit distribution changes with their sources as described above.
 
 ## Migration from 0.2.x
 
