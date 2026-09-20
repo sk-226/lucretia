@@ -105,11 +105,54 @@ images live in `assets/`. To regenerate the optional chart images, install NumPy
 and Matplotlib and run `python3 scripts/plot_check.py`. This is not part of the
 normal build. See `assets/photos/README.md` for the review images.
 
-## Manual updates
+## Releases
 
-Change the sources, increase `VERSION` when needed, build, run checks, and review
-the diff. Commit the sources and generated files together. Users download
-and replace files from GitHub.
+To ship a version, change the sources, increase `VERSION` (for example, `0.3.1`),
+then build and check:
+
+```sh
+python3 scripts/build.py
+python3 scripts/check.py
+```
+
+Review and commit the sources and generated files together. When that change
+reaches `main`, the [Release workflow](.github/workflows/release.yml) checks the
+files, creates the `vX.Y.Z` tag at the tested commit, and publishes a GitHub Release
+with generated release notes and these assets:
+
+- `lucretia-theme.vsix` for VS Code and Cursor.
+- `lucretia-ghostty-X.Y.Z.zip` with all three themes and the third-party notice.
+- `lucretia-obsidian-X.Y.Z.zip` with the `Lucretia/` theme folder, Minimal snippet,
+  and third-party notices. Install the theme folder or the snippet, as described
+  in the README.
+- `lucretia-vim-X.Y.Z.zip` for Vim and Neovim.
+- `lucretia-palette-X.Y.Z.zip` with JSON, CSS, usage instructions, and the notice.
+- `SHA256SUMS` with the SHA-256 digest of each asset.
+
+Only a version increase on `main` publishes a release. Ordinary commits do not
+create releases. Pull requests and manual **Run workflow** runs check the files
+and prepare downloadable Actions artifacts, without publishing.
+Stale generated files, invalid versions, and version
+decreases fail the workflow. The workflow does not commit generated files for you.
+It uses the repository's `GITHUB_TOKEN`; no personal token or extra secret is needed.
+Write permission is limited to the publish job.
+
+The release stays a draft until all assets have uploaded. If a run fails, use
+**Actions > Release > the failed run > Re-run failed jobs**. A draft for the same
+commit is resumed; an existing published release is left unchanged. A conflicting
+tag or draft targeting a different commit stops publication. Keep the same version
+when retrying that commit; use a new version for changes to a published release.
+
+To inspect the release files locally without publishing, choose a new output
+directory outside the generated locations:
+
+```sh
+python3 scripts/release.py --output /tmp/lucretia-release
+```
+
+Installing this workflow does not republish the current version. The first
+automatic release happens with the next version increase on `main`. Users still
+download and replace files from GitHub.
 
 ## Publish the preview
 
