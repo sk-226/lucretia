@@ -2,6 +2,7 @@
 from io import BytesIO
 from pathlib import Path
 import itertools
+import os
 import re
 import shutil
 import subprocess
@@ -149,7 +150,10 @@ class VimExportTests(unittest.TestCase):
 
 
 class EditorTests(unittest.TestCase):
-    """Each editor runs independently; missing binaries are reported as skips."""
+    """Each editor runs independently; missing binaries are reported as skips.
+
+    Set LUCRETIA_REQUIRE_EDITORS=1 to make a missing binary fail instead, as CI does.
+    """
     @classmethod
     def setUpClass(cls):
         cls.pal = build_palette()
@@ -157,6 +161,8 @@ class EditorTests(unittest.TestCase):
     def run_editor(self, editor, body):
         binary = shutil.which(editor)
         if binary is None:
+            if os.environ.get('LUCRETIA_REQUIRE_EDITORS') == '1':
+                self.fail(f'{editor} is not installed, but LUCRETIA_REQUIRE_EDITORS=1')
             self.skipTest(f'{editor} is not installed')
         with tempfile.TemporaryDirectory(prefix='lucretia editor ') as directory:
             root = Path(directory)

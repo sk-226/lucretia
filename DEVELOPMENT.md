@@ -68,7 +68,12 @@ with no user config. Each editor tests all three appearances, all nine ordered
 appearance transitions, explicit highlight colors, and actual Python syntax tokens
 with syntax enabled both before and after theme loading. Missing editors are
 reported as skipped tests; a successful core check is not proof that both editors
-were run. No editor is installed by the tests.
+were run. Set `LUCRETIA_REQUIRE_EDITORS=1` to make a missing editor fail instead.
+No editor is installed by the tests.
+
+The [Check workflow](.github/workflows/check.yml) runs on pull requests and pushes
+to `main`. It installs Vim and a pinned, checksum-verified Neovim release, runs
+`scripts/check.py` with `LUCRETIA_REQUIRE_EDITORS=1`, then runs the browser check.
 
 ```sh
 python3 -m unittest discover -s tests -p 'test_vim.py' -v

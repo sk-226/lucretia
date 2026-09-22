@@ -1,0 +1,56 @@
+name: Check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  NVIM_VERSION: v0.12.5
+  NVIM_SHA256: bce0f56eda1f1b1db6eee8f4133d7a38813ea07933837dd1777411ca384c6875
+  PLAYWRIGHT_VERSION: 1.63.0
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.13'
+      - name: Install Vim
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends vim
+      - name: Install Neovim
+        run: |
+          archive="$RUNNER_TEMP/nvim.tar.gz"
+          curl -fsSLo "$archive" "https://github.com/neovim/neovim/releases/download/$NVIM_VERSION/nvim-linux-x86_64.tar.gz"
+          echo "$NVIM_SHA256  $archive" | sha256sum --check
+          tar -xzf "$archive" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/nvim-linux-x86_64/bin" >> "$GITHUB_PATH"
+      - name: Install Playwright and Chromium
+        run: |
+          python3 -m pip install "playwright==$PLAYWRIGHT_VERSION"
+          python3 -m playwright install --with-deps chromium
+      - name: Show editor versions
+        run: |
+          vim --version | head -n 1
+          nvim --version | head -n 1
+      - name: Core checks with both editors required
+        env:
+          LUCRETIA_REQUIRE_EDITORS: '1'
+        run: python3 scripts/check.py
+      - name: Browser checks
+        run: python3 tests/browser_check.py
