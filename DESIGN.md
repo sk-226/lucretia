@@ -54,12 +54,20 @@ Do not place colored links or syntax text on them without checking the result.
 
 The light photo surface matches the light background. The dark photo surface
 is `base-950`. The JSON also includes gallery scrims, an optional quiet text
-profile, and presentation roles.
+profile, and presentation roles. Paper is a reading profile and has no photo
+surface or presentation roles.
+
+Tint fills (steps 50 to 200) take same-hue 800 text, as in the presentation
+note and info boxes. A fill should differ from the page background by at least
+ΔEok 0.02 to stay visible without a border. Tint steps can be used as text only
+on same-hue backgrounds of 800 or darker, and only where the pair reaches the
+quiet text target.
 
 ## Evaluation
 
 High-contrast body text targets WCAG contrast of at least 7:1 and APCA magnitude
 of at least 90. The quiet profile targets 4.5:1 and APCA magnitude 75.
+Colors that reach only 3:1 and APCA magnitude 60 are limited to large or bold text.
 These targets do not establish accessibility conformance for every UI element.
 Font size, weight, context, and non-color cues still affect readability.
 Faint syntax and decorative colors are

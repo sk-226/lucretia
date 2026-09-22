@@ -2,7 +2,7 @@
 from color import oklch_to_hex, clamp_chroma, deltaE_ok, hex_to_rgb
 
 # ============================================================
-# Design parameters from DESIGN.md, seeded from measured Flexoki values.
+# Design parameters, seeded from measured Flexoki values. DESIGN.md explains them.
 # ============================================================
 STEPS = [50, 100, 150, 200, 300, 400, 500, 600, 700, 800, 850, 900, 950]
 
@@ -182,7 +182,7 @@ ROLES = {
         quote_text='pbase-700', quote_border='pbase-200', hr='pbase-150',
     ),
 }
-SCRIM_ALPHAS = (5, 10, 20, 40, 60, 80)  # % (DESIGN.md overlay-scrim)
+SCRIM_ALPHAS = (5, 10, 20, 40, 60, 80)  # Gallery scrim opacities, in percent.
 
 
 def resolve_ref(pal, ref):
