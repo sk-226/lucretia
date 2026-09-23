@@ -32,6 +32,18 @@ Select the file, then run **Preferences: Color Theme** and choose **Lucretia Lig
 
 To update, download and install the new VSIX. Reload the editor when prompted.
 
+### Zed
+
+Download [lucretia.json](dist/zed/themes/lucretia.json), which contains all three
+appearances. Copy it into `~/.config/zed/themes/` on macOS or Linux, or
+`%USERPROFILE%\AppData\Roaming\Zed\themes\` on Windows. Create the directory
+if needed. Restart Zed, run **theme selector: toggle**, and choose **Lucretia Light**,
+**Lucretia Dark**, or **Lucretia Paper**.
+
+To update, replace the JSON and restart Zed. No extension-store installation or
+build tools are required. See [the Zed README](dist/zed/README.md) for system
+appearance switching, development-extension installation, and highlighting differences.
+
 ### Ghostty
 
 Download [Light](dist/ghostty/Lucretia%20Light),

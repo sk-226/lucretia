@@ -45,7 +45,7 @@ class ReleaseTests(unittest.TestCase):
     def test_assets_cover_every_distribution_and_match_checksums(self):
         expected = {'lucretia-theme.vsix', 'SHA256SUMS',
                     *{f'lucretia-{kind}-{self.version}.zip'
-                      for kind in ('ghostty', 'obsidian', 'palette', 'vim')}}
+                      for kind in ('ghostty', 'obsidian', 'palette', 'vim', 'zed')}}
         self.assertEqual(set(self.assets), expected)
         lines = self.assets['SHA256SUMS'].decode().splitlines()
         self.assertEqual(len(lines), len(expected) - 1)
@@ -56,7 +56,7 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(self.assets[f'lucretia-vim-{self.version}.zip'], self.outputs['dist/vim/lucretia-vim.zip'])
 
     def test_zip_layouts_are_installable_and_include_notices(self):
-        for kind in ('ghostty', 'palette'):
+        for kind in ('ghostty', 'palette', 'zed'):
             prefix = f'dist/{kind}/'
             with self.subTest(kind=kind), ZipFile(BytesIO(self.assets[f'lucretia-{kind}-{self.version}.zip'])) as archive:
                 self.assertIsNone(archive.testzip())

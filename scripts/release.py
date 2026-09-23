@@ -29,7 +29,7 @@ def version_changed(version, previous):
 def release_assets(version, outputs):
     assets = {'lucretia-theme.vsix': outputs['dist/vscode/lucretia-theme.vsix'],
               f'lucretia-vim-{version}.zip': outputs['dist/vim/lucretia-vim.zip']}
-    for kind in ('ghostty', 'palette'):
+    for kind in ('ghostty', 'palette', 'zed'):
         prefix = f'dist/{kind}/'
         files = {name.removeprefix(prefix): data for name, data in outputs.items()
                  if name.startswith(prefix)}
