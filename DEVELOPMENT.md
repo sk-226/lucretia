@@ -9,9 +9,10 @@ python3 scripts/check.py
 ```
 
 The build creates the JSON, CSS, VSIX, Obsidian ZIP, Ghostty files, Vim / Neovim
-colorschemes and ZIP, preview, and review pages. It does not install anything or change app settings. `VERSION`
-sets the version in both app packages. Increase it when shipping a new version.
-The extension ID is `sugu.lucretia-theme`.
+colorschemes and ZIP, preview, and review pages. It does not install anything or
+change app settings. `VERSION` sets the version of the VS Code extension and the
+Obsidian theme manifest, and names the release assets. Increase it when shipping
+a new version. The extension ID is `sugu.lucretia-theme`.
 
 ## Edit and output locations
 
@@ -150,9 +151,8 @@ directory outside the generated locations:
 python3 scripts/release.py --output /tmp/lucretia-release
 ```
 
-Installing this workflow does not republish the current version. The first
-automatic release happens with the next version increase on `main`. Users still
-download and replace files from GitHub.
+Releases are not installed automatically. Users download and replace the files
+from GitHub.
 
 ## Publish the preview
 
@@ -161,8 +161,7 @@ locally does not require a server. There are no external scripts, fonts, or
 runtime requests for the palette.
 
 In the GitHub repository, open **Settings > Pages > Build and deployment** and
-set **Source** to **GitHub Actions**. This is a one-time change from the previous
-**main /docs** branch publishing setup.
+set **Source** to **GitHub Actions**. This is a one-time setting.
 
 The workflow in `.github/workflows/pages.yml` runs on pushes to `main` and can
 also be started from **Actions > Build and deploy Pages > Run workflow** on

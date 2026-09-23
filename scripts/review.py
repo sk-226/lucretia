@@ -203,7 +203,7 @@ def html_contrast(pal):
     light_bgs = [('bg', pal['bg']['bg']), ('bg-2', pal['bg']['bg2']), ('white', wht)]
     light_fgs = ([('black', blk)]
                  + [(f'base-{s}', bs[s]['hex']) for s in (800, 700, 600)]
-                 + [('tx-navy (blue-900)', ac['blue'][900]['hex'])]
+                 + [('blue-900', ac['blue'][900]['hex'])]
                  + [(f'{n}-600', ac[n][600]['hex']) for n in ACCENTS])
     h.append(matrix('Light theme', light_fgs, light_bgs))
 
@@ -220,7 +220,7 @@ def html_contrast(pal):
     tint_fgs = ([('black', blk)]
                 + [(f'{n}-800', ac[n][800]['hex']) for n in ('red', 'blue', 'green', 'yellow')])
     h.append(matrix('Text on tint fills (100)', tint_fgs, tint_bgs,
-                    'Checks the planned use of same-hue 800 text on tint-100 fills (DESIGN.md).'))
+                    'Checks same-hue 800 text on tint-100 fills, as used by the presentation note and info roles (DESIGN.md).'))
 
     # Tint visibility is checked separately because WCAG/APCA do not model fills.
     h.append('<h2>Tint Fill Visibility (50-200): ΔEok vs Background</h2>'

@@ -35,7 +35,8 @@ jobs:
       - name: Prepare release assets
         id: assets
         env:
-          BEFORE: ${{ github.event.before || github.event.pull_request.base.sha }}
+          # Pull requests compare with their base. The previous head can vanish after a force-push.
+          BEFORE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
         run: |
           args=(--output "$RUNNER_TEMP/release-assets")
           if [[ -n "$BEFORE" ]]; then
