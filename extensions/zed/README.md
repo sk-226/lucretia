@@ -32,13 +32,22 @@ To update, replace `lucretia.json` and restart Zed.
 ## Development extension
 
 Alternatively, use **zed: install dev extension** and select the directory
-containing this README and `extension.toml` (`dist/zed` in the source repository).
+containing this README and `extension.toml` (`extensions/zed` in the source repository).
 Do not select the repository root. Use either the local JSON or the development
 extension, not both: they register the same theme names.
 
-This directory is a data-only theme extension. It does not install languages,
-change settings, or run code in the editor. Its version follows the repository's
-`VERSION`. These files do not register or publish an extension in Zed's store.
+This directory is the Zed extension root. It is a data-only theme extension: it
+does not install languages, change settings, or run code in the editor. Keep the
+version in `extension.toml` equal to the repository's `VERSION`.
+
+## Publishing
+
+The Lucretia repository can stay a monorepo. In `zed-industries/extensions`, the
+submodule can point at this repository and use `path = "extensions/zed"`.
+
+Before the first registry submission, add a Zed-accepted project license at
+`extensions/zed/LICENSE`. `THIRD_PARTY_NOTICES.md` records the Flexoki
+attribution and license; it is not a license for Lucretia itself.
 
 ## Highlighting
 

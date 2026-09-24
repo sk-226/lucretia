@@ -29,11 +29,19 @@ def version_changed(version, previous):
 def release_assets(version, outputs):
     assets = {'lucretia-theme.vsix': outputs['dist/vscode/lucretia-theme.vsix'],
               f'lucretia-vim-{version}.zip': outputs['dist/vim/lucretia-vim.zip']}
-    for kind in ('ghostty', 'palette', 'zed'):
+    for kind in ('ghostty', 'palette'):
         prefix = f'dist/{kind}/'
         files = {name.removeprefix(prefix): data for name, data in outputs.items()
                  if name.startswith(prefix)}
         assets[f'lucretia-{kind}-{version}.zip'] = zip_bytes(files)
+    zed_root = build.ROOT / 'extensions/zed'
+    zed = {
+        'extension.toml': (zed_root / 'extension.toml').read_bytes(),
+        'README.md': (zed_root / 'README.md').read_bytes(),
+        build.NOTICE: (zed_root / build.NOTICE).read_bytes(),
+        'themes/lucretia.json': outputs['extensions/zed/themes/lucretia.json'],
+    }
+    assets[f'lucretia-zed-{version}.zip'] = zip_bytes(zed)
     with ZipFile(BytesIO(outputs['dist/obsidian/Lucretia.zip'])) as archive:
         obsidian = {name: archive.read(name) for name in archive.namelist()}
     obsidian['lucretia-minimal.css'] = outputs['dist/obsidian/lucretia-minimal.css']

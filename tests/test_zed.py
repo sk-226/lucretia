@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
 from export import ANSI_NAMES, KINDS, ansi, selection_color, theme_context
 from palette import build_palette
-from zed_theme import SCHEMA, zed_manifest, zed_theme, zed_theme_family
+from zed_theme import SCHEMA, zed_theme, zed_theme_family
 
 
 class ZedTests(unittest.TestCase):
@@ -111,18 +111,19 @@ class ZedTests(unittest.TestCase):
         self.assertEqual(zed_theme_family(json.loads(json.dumps(pal))), zed_theme_family(pal))
 
     def test_generated_theme_extension_and_notices_match_sources(self):
-        folder = ROOT / 'dist/zed'
+        folder = ROOT / 'extensions/zed'
         version = (ROOT / 'VERSION').read_text().strip()
         self.assertEqual((folder / 'themes/lucretia.json').read_bytes(),
                          (json.dumps(self.family, ensure_ascii=False, indent=2) + '\n').encode())
-        self.assertEqual((folder / 'extension.toml').read_text(), zed_manifest(version))
-        self.assertIn(f'version = "{version}"\n', zed_manifest(version))
-        self.assertIn('schema_version = 1\n', zed_manifest(version))
-        for source, target in (('scripts/zed.README.md', 'README.md'),
-                               ('THIRD_PARTY_NOTICES.md', 'THIRD_PARTY_NOTICES.md')):
-            self.assertEqual((folder / target).read_bytes(), (ROOT / source).read_bytes())
+        manifest = (folder / 'extension.toml').read_text()
+        self.assertIn('id = "lucretia-theme"\n', manifest)
+        self.assertIn(f'version = "{version}"\n', manifest)
+        self.assertIn('schema_version = 1\n', manifest)
+        self.assertEqual((folder / 'THIRD_PARTY_NOTICES.md').read_bytes(),
+                         (ROOT / 'THIRD_PARTY_NOTICES.md').read_bytes())
         self.assertEqual({p.relative_to(folder).as_posix() for p in folder.rglob('*') if p.is_file()},
-                         {'extension.toml', 'themes/lucretia.json', 'README.md', 'THIRD_PARTY_NOTICES.md'})
+                         {'extension.toml', 'themes/lucretia.json', 'README.md',
+                          'THIRD_PARTY_NOTICES.md'})
 
 
 if __name__ == '__main__':

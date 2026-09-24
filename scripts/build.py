@@ -13,7 +13,7 @@ from export import (KINDS, theme_context, palette_colors, tokens_css,
 from package import vscode_package, vsix_bytes, zip_bytes
 import review
 from vim_theme import vim_theme
-from zed_theme import zed_manifest, zed_theme_family
+from zed_theme import zed_theme_family
 
 ROOT = Path(__file__).resolve().parent.parent
 NOTICE = 'THIRD_PARTY_NOTICES.md'
@@ -104,9 +104,6 @@ def render():
     vim = {'README.md': (ROOT / 'scripts/vim.README.md').read_bytes(), NOTICE: notice}
     for kind in KINDS:
         vim[f'colors/lucretia-{kind}.vim'] = vim_theme(pal, kind).encode()
-    zed = {'extension.toml': zed_manifest(version).encode(),
-           'themes/lucretia.json': json_bytes(zed_theme_family(pal)),
-           'README.md': (ROOT / 'scripts/zed.README.md').read_bytes(), NOTICE: notice}
     outputs = {
         'dist/palette/palette.json': json_bytes(pal),
         'dist/palette/tokens.css': css.encode(),
@@ -116,7 +113,7 @@ def render():
         'dist/obsidian/lucretia-minimal.css': obsidian_css(pal, minimal=True).encode(),
         'docs/index.html': preview_html(pal, css).encode(),
     }
-    outputs.update({f'dist/zed/{name}': data for name, data in zed.items()})
+    outputs['extensions/zed/themes/lucretia.json'] = json_bytes(zed_theme_family(pal))
     outputs.update({f'dist/vim/{name}': data for name, data in vim.items()})
     outputs['dist/vim/lucretia-vim.zip'] = zip_bytes(
         {f'lucretia-vim/{name}': data for name, data in vim.items()})
@@ -133,8 +130,9 @@ def render():
 def output_files(root):
     paths = {p.relative_to(root).as_posix() for folder in ('dist', 'review')
              for p in (root / folder).rglob('*') if p.is_file() and p.name != '.DS_Store'}
-    if (root / 'docs/index.html').is_file():
-        paths.add('docs/index.html')
+    for name in ('docs/index.html', 'extensions/zed/themes/lucretia.json'):
+        if (root / name).is_file():
+            paths.add(name)
     return paths
 
 

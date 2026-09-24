@@ -5,17 +5,6 @@ from export import KINDS, ansi, selection_color, theme_context
 SCHEMA = 'https://zed.dev/schema/themes/v0.2.0.json'
 
 
-def zed_manifest(version):
-    """The build validates VERSION before generating this data-only extension."""
-    return ('id = "lucretia"\n'
-            'name = "Lucretia"\n'
-            f'version = "{version}"\n'
-            'schema_version = 1\n'
-            'authors = ["sk-226"]\n'
-            'description = "Light, Dark, and Paper color themes for code and notes."\n'
-            'repository = "https://github.com/sk-226/lucretia"\n')
-
-
 def zed_theme(pal, kind):
     ui, syn, md = theme_context(pal, kind)
     light = kind != 'dark'
