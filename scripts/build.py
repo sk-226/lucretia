@@ -128,11 +128,11 @@ def render():
 
 
 def output_files(root):
-    paths = {p.relative_to(root).as_posix() for folder in ('dist', 'review')
+    paths = {p.relative_to(root).as_posix()
+             for folder in ('dist', 'review', 'extensions/zed/themes')
              for p in (root / folder).rglob('*') if p.is_file() and p.name != '.DS_Store'}
-    for name in ('docs/index.html', 'extensions/zed/themes/lucretia.json'):
-        if (root / name).is_file():
-            paths.add(name)
+    if (root / 'docs/index.html').is_file():
+        paths.add('docs/index.html')
     return paths
 
 

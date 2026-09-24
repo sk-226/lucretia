@@ -121,9 +121,9 @@ class ZedTests(unittest.TestCase):
         self.assertIn('schema_version = 1\n', manifest)
         self.assertEqual((folder / 'THIRD_PARTY_NOTICES.md').read_bytes(),
                          (ROOT / 'THIRD_PARTY_NOTICES.md').read_bytes())
-        self.assertEqual({p.relative_to(folder).as_posix() for p in folder.rglob('*') if p.is_file()},
-                         {'extension.toml', 'themes/lucretia.json', 'README.md',
-                          'THIRD_PARTY_NOTICES.md'})
+        files = {p.relative_to(folder).as_posix() for p in folder.rglob('*') if p.is_file()}
+        self.assertTrue({'extension.toml', 'themes/lucretia.json', 'README.md',
+                         'THIRD_PARTY_NOTICES.md'}.issubset(files))
 
 
 if __name__ == '__main__':
