@@ -223,9 +223,9 @@ The repository does not need a separate Zed-only repository. When registering th
 extension in `zed-industries/extensions`, point the submodule at this repository
 and set `path = "extensions/zed"`.
 
-Before the first registry submission, add a supported project license at
-`extensions/zed/LICENSE`. The current `THIRD_PARTY_NOTICES.md` covers Flexoki's
-license and attribution, not Lucretia's own license.
+Lucretia is MIT-licensed. `extensions/zed/LICENSE` is a relative symbolic link to
+the repository's `LICENSE`, because the registry reads the license from the
+extension root. `THIRD_PARTY_NOTICES.md` covers Flexoki's license and attribution.
 
 ## References
 

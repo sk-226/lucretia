@@ -45,9 +45,8 @@ version in `extension.toml` equal to the repository's `VERSION`.
 The Lucretia repository can stay a monorepo. In `zed-industries/extensions`, the
 submodule can point at this repository and use `path = "extensions/zed"`.
 
-Before the first registry submission, add a Zed-accepted project license at
-`extensions/zed/LICENSE`. `THIRD_PARTY_NOTICES.md` records the Flexoki
-attribution and license; it is not a license for Lucretia itself.
+`LICENSE` is the project's MIT license, linked from the repository root.
+`THIRD_PARTY_NOTICES.md` records the Flexoki attribution and license.
 
 ## Highlighting
 

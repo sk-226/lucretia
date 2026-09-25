@@ -147,6 +147,10 @@ replace your vault settings or Style Settings data.
 the generator. `review/` contains the detailed color checks, separate from the site.
 See [DEVELOPMENT.md](DEVELOPMENT.md) for building, testing, and publishing the preview.
 
+## License
+
+Lucretia is released under the [MIT License](LICENSE).
+
 ## Attribution
 
 Lucretia is inspired by [Flexoki](https://stephango.com/flexoki) by Steph Ango.

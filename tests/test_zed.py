@@ -123,7 +123,9 @@ class ZedTests(unittest.TestCase):
                          (ROOT / 'THIRD_PARTY_NOTICES.md').read_bytes())
         files = {p.relative_to(folder).as_posix() for p in folder.rglob('*') if p.is_file()}
         self.assertTrue({'extension.toml', 'themes/lucretia.json', 'README.md',
-                         'THIRD_PARTY_NOTICES.md'}.issubset(files))
+                         'LICENSE', 'THIRD_PARTY_NOTICES.md'}.issubset(files))
+        self.assertEqual((folder / 'LICENSE').read_bytes(), (ROOT / 'LICENSE').read_bytes())
+        self.assertTrue((ROOT / 'LICENSE').read_text().startswith('MIT License\n'))
 
 
 if __name__ == '__main__':

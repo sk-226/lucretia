@@ -66,9 +66,9 @@ class ReleaseTests(unittest.TestCase):
         with ZipFile(BytesIO(self.assets[f'lucretia-zed-{self.version}.zip'])) as archive:
             self.assertIsNone(archive.testzip())
             self.assertEqual(set(archive.namelist()),
-                             {'extension.toml', 'README.md', build.NOTICE, 'themes/lucretia.json'})
+                             {'extension.toml', 'README.md', 'LICENSE', build.NOTICE, 'themes/lucretia.json'})
             zed_root = ROOT / 'extensions/zed'
-            for name in ('extension.toml', 'README.md', build.NOTICE):
+            for name in ('extension.toml', 'README.md', 'LICENSE', build.NOTICE):
                 self.assertEqual(archive.read(name), (zed_root / name).read_bytes())
             self.assertEqual(archive.read('themes/lucretia.json'),
                              self.outputs['extensions/zed/themes/lucretia.json'])

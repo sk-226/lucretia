@@ -38,6 +38,7 @@ def release_assets(version, outputs):
     zed = {
         'extension.toml': (zed_root / 'extension.toml').read_bytes(),
         'README.md': (zed_root / 'README.md').read_bytes(),
+        'LICENSE': (zed_root / 'LICENSE').read_bytes(),
         build.NOTICE: (zed_root / build.NOTICE).read_bytes(),
         'themes/lucretia.json': outputs['extensions/zed/themes/lucretia.json'],
     }
