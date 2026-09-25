@@ -45,7 +45,7 @@ class ReleaseTests(unittest.TestCase):
     def test_assets_cover_every_distribution_and_match_checksums(self):
         expected = {'lucretia-theme.vsix', 'SHA256SUMS',
                     *{f'lucretia-{kind}-{self.version}.zip'
-                      for kind in ('ghostty', 'obsidian', 'palette', 'vim')}}
+                      for kind in ('ghostty', 'obsidian', 'palette', 'vim', 'zed')}}
         self.assertEqual(set(self.assets), expected)
         lines = self.assets['SHA256SUMS'].decode().splitlines()
         self.assertEqual(len(lines), len(expected) - 1)
@@ -63,6 +63,15 @@ class ReleaseTests(unittest.TestCase):
                 self.assertIn(build.NOTICE, archive.namelist())
                 self.assertEqual({prefix + name: archive.read(name) for name in archive.namelist()},
                                  {name: data for name, data in self.outputs.items() if name.startswith(prefix)})
+        with ZipFile(BytesIO(self.assets[f'lucretia-zed-{self.version}.zip'])) as archive:
+            self.assertIsNone(archive.testzip())
+            self.assertEqual(set(archive.namelist()),
+                             {'extension.toml', 'README.md', 'LICENSE', build.NOTICE, 'themes/lucretia.json'})
+            zed_root = ROOT / 'extensions/zed'
+            for name in ('extension.toml', 'README.md', 'LICENSE', build.NOTICE):
+                self.assertEqual(archive.read(name), (zed_root / name).read_bytes())
+            self.assertEqual(archive.read('themes/lucretia.json'),
+                             self.outputs['extensions/zed/themes/lucretia.json'])
         with ZipFile(BytesIO(self.assets[f'lucretia-obsidian-{self.version}.zip'])) as archive:
             self.assertIsNone(archive.testzip())
             self.assertEqual(set(archive.namelist()), {'Lucretia/manifest.json', 'Lucretia/theme.css',
@@ -80,6 +89,7 @@ class ReleaseTests(unittest.TestCase):
             shutil.copytree(ROOT / 'scripts', root / 'scripts', ignore=shutil.ignore_patterns('__pycache__'))
             for name in ('VERSION', build.NOTICE):
                 shutil.copyfile(ROOT / name, root / name)
+            shutil.copytree(ROOT / 'extensions', root / 'extensions')
             build.write_outputs(root, self.outputs)
             stale = root / 'dist/vscode/lucretia-theme.vsix'
             stale.write_bytes(b'stale package')

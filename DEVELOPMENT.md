@@ -9,10 +9,12 @@ python3 scripts/check.py
 ```
 
 The build creates the JSON, CSS, VSIX, Obsidian ZIP, Ghostty files, Vim / Neovim
-colorschemes and ZIP, preview, and review pages. It does not install anything or
-change app settings. `VERSION` sets the version of the VS Code extension and the
-Obsidian theme manifest, and names the release assets. Increase it when shipping
-a new version. The extension ID is `sugu.lucretia-theme`.
+colorschemes and ZIP, the Zed theme JSON, preview, and review pages. It does not
+install anything or change app settings. `VERSION` sets the VS Code extension and
+Obsidian theme versions and names the release assets. Keep
+`extensions/zed/extension.toml` at the same version when shipping a release.
+The VS Code extension ID is `sugu.lucretia-theme`; the Zed extension ID is
+`lucretia-theme`.
 
 ## Edit and output locations
 
@@ -22,6 +24,9 @@ a new version. The extension ID is `sugu.lucretia-theme`.
 | `scripts/color.py` | Color conversion and numerical checks. |
 | `scripts/export.py` | App mappings and public CSS variables. |
 | `scripts/vim_theme.py`, `scripts/vim.README.md` | Shared Vim / Neovim mappings and installation text. |
+| `scripts/zed_theme.py` | Zed theme mapping and generated theme family. |
+| `extensions/zed/` | Zed extension root; manifest, README, and notice are source files. |
+| `extensions/zed/themes/lucretia.json` | Generated Zed theme family. Do not edit by hand. |
 | `scripts/package.py` | Fixed ZIP / VSIX packaging for these data-only themes. |
 | `scripts/preview.html` | The preview's HTML template. |
 | `docs/style.css`, `docs/preview.js` | The preview's layout and interactions. |
@@ -32,8 +37,10 @@ a new version. The extension ID is `sugu.lucretia-theme`.
 | `review/` | Generated color review pages. Not part of the public preview site. |
 | `tests/` | Color, format, packaging, and failure-path checks. |
 
-Do not edit `dist/`, `review/`, or `docs/index.html` by hand. The build owns these
-locations and removes unexpected files there, including old VSIX copies.
+Do not edit `dist/`, `review/`, `docs/index.html`, or
+`extensions/zed/themes/lucretia.json` by hand. The build owns these generated
+locations and removes unexpected files there, including old VSIX copies. The other
+files under `extensions/zed/` are source files and are not overwritten.
 
 Every output uses a freshly generated in-memory palette from `scripts/palette.py`.
 
@@ -86,6 +93,22 @@ updates run in the editor. Terminal palettes apply to new terminal buffers.
 The schemes use RGB colors only; they do not attempt a 256-color fallback.
 Native visual checks are described in [demo/README.md](demo/README.md).
 
+### Zed checks
+
+```sh
+python3 -m unittest discover -s tests -p 'test_zed.py' -v
+```
+
+These tests check the three appearances, syntax styles, shared UI and ANSI colors,
+palette updates, JSON value types, and generated extension files. The release tests
+also check the Zed ZIP and its checksum. They do not launch Zed or validate native
+rendering. No network access or Zed installation is required for the core suite.
+
+For a native check, follow [the Zed README](extensions/zed/README.md), switch through
+Light, Dark, and Paper, and inspect code comments, Markdown emphasis, selections,
+diagnostics, and an ANSI terminal sample. Check both the local-JSON installation
+and the development extension separately; they use the same theme names.
+
 ### Browser checks
 
 The optional browser test needs Playwright and a Chromium installation. These are
@@ -132,6 +155,9 @@ with generated release notes and these assets:
   and third-party notices. Install the theme folder or the snippet, as described
   in the README.
 - `lucretia-vim-X.Y.Z.zip` for Vim and Neovim.
+- `lucretia-zed-X.Y.Z.zip` assembled from `extensions/zed/`, with the generated
+  theme family, extension manifest, README, and third-party notice. This does not
+  publish to the Zed extension store.
 - `lucretia-palette-X.Y.Z.zip` with JSON, CSS, usage instructions, and the notice.
 - `SHA256SUMS` with the SHA-256 digest of each asset.
 
@@ -191,11 +217,22 @@ Disable the 0.2.x `lucretia-paper.css` snippet before enabling the Lucretia them
 or `lucretia-minimal.css`.
 The extension ID and appearance names have not changed.
 
+## Zed registry publishing
+
+The repository does not need a separate Zed-only repository. When registering the
+extension in `zed-industries/extensions`, point the submodule at this repository
+and set `path = "extensions/zed"`.
+
+Lucretia is MIT-licensed. `extensions/zed/LICENSE` is a relative symbolic link to
+the repository's `LICENSE`, because the registry reads the license from the
+extension root. `THIRD_PARTY_NOTICES.md` covers Flexoki's license and attribution.
+
 ## References
 
 - [Ghostty theme configuration](https://ghostty.org/docs/config/reference#theme)
 - [VS Code extension packaging](https://code.visualstudio.com/api/working-with-extensions/publishing-extension)
 - [Obsidian theme development](https://docs.obsidian.md/Themes/App+themes/Build+a+theme)
+- [Zed theme extensions](https://zed.dev/docs/extensions/themes)
 - [Vim colorscheme loading](https://vimhelp.org/syntax.txt.html#%3Acolorscheme)
 - [Neovim Tree-sitter captures](https://neovim.io/doc/user/treesitter/#treesitter-highlight-groups)
 - [Neovim LSP semantic highlights](https://neovim.io/doc/user/lsp/#lsp-semantic-highlight)

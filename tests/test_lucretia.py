@@ -252,7 +252,8 @@ class LucretiaTests(unittest.TestCase):
         for name in self.outputs:
             self.assertFalse(Path(name).is_absolute())
             self.assertNotIn('..', Path(name).parts)
-            self.assertTrue(name.startswith(('dist/', 'review/')) or name == 'docs/index.html')
+            self.assertTrue(name.startswith(('dist/', 'review/')) or
+                            name in ('docs/index.html', 'extensions/zed/themes/lucretia.json'))
         self.assertEqual(len([n for n in self.outputs if n.endswith('.vsix')]), 1)
         self.assertFalse(any('node_modules' in n or 'photos' in n for n in self.outputs))
 

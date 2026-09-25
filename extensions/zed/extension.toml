@@ -1,0 +1,7 @@
+id = "lucretia-theme"
+name = "Lucretia"
+version = "0.3.1"
+schema_version = 1
+authors = ["sk-226"]
+description = "Light, Dark, and Paper color themes for code and notes."
+repository = "https://github.com/sk-226/lucretia"
